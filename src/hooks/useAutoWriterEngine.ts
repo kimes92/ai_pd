@@ -77,7 +77,7 @@ const buildContext = (settings: NovelSettings, episodes: NovelEpisode[]) => {
 
 export interface AutoWriterState {
   isAutoMode: boolean;
-  currentStep: string; // idle / writing / reviewing / updating-arcs / applying-feedback / paused
+  currentStep: string; // idle / writing / reviewing / revising / updating-arcs / applying-feedback / paused
   currentEpisodeId: string | null;
   pipelineLog: PipelineLog[];
   isProcessing: boolean;
@@ -156,8 +156,8 @@ export function useAutoWriterEngine(
 
       const context = buildContext(settings, episodes);
 
-      // ──────── STEP 1: 메인작가 AI ─ 이어쓰기 ────────
-      addLog("step1", "메인작가 AI", "본문 이어쓰기 시작 (~3000자)...");
+      // ──────── STEP 1: 메인작가 AI ─ 초안 작성 ────────
+      addLog("step1", "메인작가 AI", "초안 작성 시작 (~3000자)...");
 
       const mainWriterSystem = `당신은 총괄 집필을 담당하는 '메인작가 AI'입니다.\n\n[규칙]\n- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기\n- 주요 인물 외에도 상황에 맞는 엑스트라·조연을 자유롭게 삽입\n- 문체 가이드는 절대 복사하지 말고 톤과 호흡만 학습 적용\n\n**IMPORTANT: 반드시 한국어(Korean)로만 출력하세요.**`;
 
@@ -181,44 +181,59 @@ export function useAutoWriterEngine(
 
       if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
-      const generatedText = await callLocalAI(mainWriterSystem, mainWriterUser, controller.signal);
+      const generatedDraft = await callLocalAI(mainWriterSystem, mainWriterUser, controller.signal);
 
-      if (!generatedText) {
-        addLog("error", "메인작가 AI", "텍스트 생성 실패");
+      if (!generatedDraft) {
+        addLog("error", "메인작가 AI", "초안 텍스트 생성 실패");
         return;
       }
 
-      addLog("step1-done", "메인작가 AI", `${generatedText.length}자 생성 완료!`);
+      addLog("step1-done", "메인작가 AI", `${generatedDraft.length}자 초안 생성 완료!`);
 
-      // 에피소드에 내용 추가
-      const updatedContent = currentContent ? currentContent + "\n\n" + generatedText : generatedText;
-      await updateEpisode(targetEpisode.id, { content: updatedContent });
-
-      // ──────── STEP 2: 작가1 AI ─ 개연성 검토 ────────
+      // ──────── STEP 2: 검수작가 AI ─ 개연성 검토 ────────
       if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
       setAutoState((prev) => ({ ...prev, currentStep: "reviewing" }));
-      addLog("step2", "작가1 AI", "개연성 및 맥락 일관성 검토 중...");
+      addLog("step2", "검수작가 AI", "개연성 및 맥락 일관성 검토 중...");
 
-      const reviewer1System = `당신은 스토리 개연성과 일관성을 검토하는 '작가1 AI'입니다.\n\n[규칙]\n- 이전 에피소드와 현재 내용의 모순을 찾아 보고하세요.\n- 인물의 말투, 성격, 관계가 설정과 일치하는지 확인하세요.\n- 결과는 간결한 리포트 형식(한국어)으로 출력하세요.\n\n**IMPORTANT: 반드시 한국어(Korean)로만 출력하세요.**`;
+      const reviewerSystem = `당신은 스토리 개연성과 일관성을 검토하는 '검수작가 AI'입니다.\n\n[규칙]\n- 이전 에피소드 내용 및 설정과 방금 작성된 초안의 모순(OOC, 설정 오류 등)을 찾아내세요.\n- 인물의 말투, 성격, 관계가 설정과 일치하는지 확인하세요.\n- 비판적이고 날카로운 시각으로 분석 결과를 리포트 형식으로 출력하세요.\n\n**IMPORTANT: 반드시 한국어(Korean)로만 출력하세요.**`;
 
-      const reviewer1User = `${context}\n[방금 추가된 텍스트]\n${generatedText}\n\n위 텍스트의 개연성, 인물 일관성, 스토리 흐름을 검토하고 피드백을 제공해 주세요.`;
+      const reviewerUser = `${context}\n[방금 작성된 초안]\n${generatedDraft}\n\n위 초안의 개연성, 인물 일관성, 스토리 흐름을 검토하고 구체적인 수정 방향(피드백)을 제공해 주세요.`;
 
-      const reviewResult = await callLocalAI(reviewer1System, reviewer1User, controller.signal);
-      addLog("step2-done", "작가1 AI", reviewResult ? `검토 완료: ${reviewResult.substring(0, 100)}...` : "검토 완료");
+      const reviewResult = await callLocalAI(reviewerSystem, reviewerUser, controller.signal);
+      addLog("step2-done", "검수작가 AI", reviewResult ? `분석 완료: ${reviewResult.substring(0, 100)}...` : "분석 완료");
 
-      // ──────── STEP 3: 작가2 AI ─ 인물 아크 업데이트 ────────
+      // ──────── STEP 3: 메인작가 AI ─ 교정 및 보완 (Revision) ────────
+      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+
+      setAutoState((prev) => ({ ...prev, currentStep: "revising" }));
+      addLog("step3", "메인작가 AI", "검수 결과를 바탕으로 초안 보완 및 수정 중...");
+
+      const revisionSystem = `당신은 검수 피드백을 바탕으로 글을 완벽하게 다듬는 '메인작가 AI (교정 모드)'입니다.\n\n[규칙]\n- 주어진 초안과 검수 피드백을 모두 읽고, 피드백의 지적 사항을 반영하여 초안을 수정하세요.\n- 수정된 최종 결과물만 출력하세요. (인사말, 설명 등 불필요한 말 금지)\n- 분량은 3000자 이내로 유지하고, 문맥이 부자연스럽게 끊기지 않도록 매끄럽게 연결하세요.\n\n**IMPORTANT: 반드시 한국어(Korean)로만 최종 소설 텍스트를 출력하세요.**`;
+      
+      const revisionUser = `[원본 초안]\n${generatedDraft}\n\n[검수작가 피드백]\n${reviewResult}\n\n위 피드백을 반영하여 원본 초안을 수정하고 보완한 최종 텍스트를 작성해 주세요.`;
+
+      const revisedText = await callLocalAI(revisionSystem, revisionUser, controller.signal);
+      const finalGeneratedText = revisedText || generatedDraft;
+
+      addLog("step3-done", "메인작가 AI", `보완 및 수정 완료! (${finalGeneratedText.length}자)`);
+
+      // 에피소드에 최종 내용 추가
+      const updatedContent = currentContent ? currentContent + "\n\n" + finalGeneratedText : finalGeneratedText;
+      await updateEpisode(targetEpisode.id, { content: updatedContent });
+
+      // ──────── STEP 4: 설정관리 AI ─ 인물 아크 업데이트 ────────
       if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
       setAutoState((prev) => ({ ...prev, currentStep: "updating-arcs" }));
-      addLog("step3", "작가2 AI", "인물 아크 및 감정 상태 업데이트 중...");
+      addLog("step4", "설정관리 AI", "인물 아크 및 감정 상태 업데이트 중...");
 
-      const writer2System = `당신은 인물별 스토리 아크를 추적하는 '작가2 AI'입니다.\n\n[규칙]\n- 새로 작성된 텍스트에서 각 인물의 감정 변화, 관계 변화, 새로운 정보를 추출하세요.\n- 설정 노트 형태로 간결하게 정리하세요.\n\n**IMPORTANT: 반드시 한국어(Korean)로만 출력하세요.**`;
+      const arcWriterSystem = `당신은 인물별 스토리 아크를 추적하는 '설정관리 AI'입니다.\n\n[규칙]\n- 새로 확정된 텍스트에서 각 인물의 감정 변화, 관계 변화, 새로운 정보를 추출하세요.\n- 설정 노트 형태로 간결하게 정리하세요.\n\n**IMPORTANT: 반드시 한국어(Korean)로만 출력하세요.**`;
 
-      const writer2User = `${context}\n[방금 추가된 텍스트]\n${generatedText}\n\n위 텍스트에서 인물별 변화를 추출하여 아크 업데이트 노트를 작성해 주세요.`;
+      const arcWriterUser = `${context}\n[방금 확정된 텍스트]\n${finalGeneratedText}\n\n위 텍스트에서 인물별 변화를 추출하여 아크 업데이트 노트를 작성해 주세요.`;
 
-      const arcUpdate = await callLocalAI(writer2System, writer2User, controller.signal);
-      addLog("step3-done", "작가2 AI", arcUpdate ? `아크 업데이트 완료: ${arcUpdate.substring(0, 100)}...` : "아크 업데이트 완료");
+      const arcUpdate = await callLocalAI(arcWriterSystem, arcWriterUser, controller.signal);
+      addLog("step4-done", "설정관리 AI", arcUpdate ? `아크 업데이트 완료: ${arcUpdate.substring(0, 100)}...` : "아크 업데이트 완료");
 
       // ──────── STEP 4: 결과 저장 ────────
       // 작가1, 작가2의 결과를 AI 노트로 저장
@@ -227,7 +242,7 @@ export function useAutoWriterEngine(
         newNotes.push({
           id: `ainote_review_${Date.now()}`,
           createdAt: new Date().toISOString(),
-          title: `[작가1 검토] Ep.${targetEpisode.episode_number}`,
+          title: `[검수작가 피드백] Ep.${targetEpisode.episode_number}`,
           content: reviewResult,
         });
       }
@@ -235,7 +250,7 @@ export function useAutoWriterEngine(
         newNotes.push({
           id: `ainote_arc_${Date.now()}`,
           createdAt: new Date().toISOString(),
-          title: `[작가2 아크] Ep.${targetEpisode.episode_number}`,
+          title: `[설정관리 아크] Ep.${targetEpisode.episode_number}`,
           content: arcUpdate,
         });
       }
@@ -254,7 +269,7 @@ export function useAutoWriterEngine(
         user_feedbacks: updatedFeedbacks,
       });
 
-      addLog("done", "시스템", `파이프라인 1사이클 완료! (Ep.${targetEpisode.episode_number}에 ${generatedText.length}자 추가)`);
+      addLog("done", "시스템", `파이프라인 1사이클 완료! (Ep.${targetEpisode.episode_number}에 ${finalGeneratedText.length}자 추가)`);
 
       setAutoState((prev) => ({
         ...prev,

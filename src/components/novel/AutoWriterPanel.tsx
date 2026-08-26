@@ -31,10 +31,11 @@ interface AutoWriterPanelProps {
 
 const STEP_LABELS: Record<string, { label: string; color: string; icon: any }> = {
   idle: { label: "대기 중", color: "text-muted-foreground", icon: Clock },
-  writing: { label: "메인작가 집필 중...", color: "text-purple-400", icon: BookOpen },
-  reviewing: { label: "작가1 개연성 검토 중...", color: "text-blue-400", icon: Zap },
-  "updating-arcs": { label: "작가2 인물 아크 업데이트 중...", color: "text-emerald-400", icon: UserCheck },
-  "applying-feedback": { label: "피드백 반영 중...", color: "text-amber-400", icon: MessageSquarePlus },
+  writing: { label: "메인작가 초안 집필 중...", color: "text-purple-400", icon: BookOpen },
+  reviewing: { label: "검수작가 개연성/OOC 검토 중...", color: "text-blue-400", icon: Zap },
+  revising: { label: "메인작가 피드백 반영 및 교정 중...", color: "text-pink-400", icon: BookOpen },
+  "updating-arcs": { label: "설정관리 인물 아크 갱신 중...", color: "text-emerald-400", icon: UserCheck },
+  "applying-feedback": { label: "피드백 즉시 반영 중...", color: "text-amber-400", icon: MessageSquarePlus },
 };
 
 export function AutoWriterPanel({
@@ -128,10 +129,10 @@ export function AutoWriterPanel({
 
           {/* 파이프라인 시각 표시 */}
           <div className="flex items-center gap-1 mt-3">
-            {["writing", "reviewing", "updating-arcs"].map((step, idx) => {
+            {["writing", "reviewing", "revising", "updating-arcs"].map((step, idx) => {
               const isActive = autoState.currentStep === step;
               const isDone =
-                ["writing", "reviewing", "updating-arcs"].indexOf(autoState.currentStep) > idx ||
+                ["writing", "reviewing", "revising", "updating-arcs"].indexOf(autoState.currentStep) > idx ||
                 autoState.currentStep === "idle";
               return (
                 <div key={step} className="flex items-center gap-1 flex-1">
@@ -144,15 +145,16 @@ export function AutoWriterPanel({
                         : "bg-border"
                     }`}
                   />
-                  {idx < 2 && <span className="text-[8px] text-muted-foreground">→</span>}
+                  {idx < 3 && <span className="text-[8px] text-muted-foreground">→</span>}
                 </div>
               );
             })}
           </div>
           <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
-            <span>메인작가</span>
-            <span>작가1</span>
-            <span>작가2</span>
+            <span>초안</span>
+            <span>검수</span>
+            <span>교정</span>
+            <span>설정</span>
           </div>
         </div>
       </div>
@@ -267,8 +269,8 @@ export function AutoWriterPanel({
               .map((log) => {
                 const agentColors: Record<string, string> = {
                   "메인작가 AI": "text-purple-300 bg-purple-500/10 border-purple-500/20",
-                  "작가1 AI": "text-blue-300 bg-blue-500/10 border-blue-500/20",
-                  "작가2 AI": "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
+                  "검수작가 AI": "text-blue-300 bg-blue-500/10 border-blue-500/20",
+                  "설정관리 AI": "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
                   "편집 작가 AI": "text-amber-300 bg-amber-500/10 border-amber-500/20",
                   시스템: "text-gray-300 bg-gray-500/10 border-gray-500/20",
                   사용자: "text-rose-300 bg-rose-500/10 border-rose-500/20",
