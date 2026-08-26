@@ -25,8 +25,8 @@ export default defineConfig(({ mode }) => ({
         background_color: '#FAFAFA',
         display: 'standalone',
         orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
+        scope: '/ai_pd/',
+        start_url: '/ai_pd/',
         icons: [
           {
             src: '/icon-192x192.png',
