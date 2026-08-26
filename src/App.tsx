@@ -121,7 +121,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter basename="/ai_pd/">
           <AppRoutes />
         </BrowserRouter>
       </TooltipProvider>
