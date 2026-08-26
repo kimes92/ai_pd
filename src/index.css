@@ -1,0 +1,277 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 260 20% 6%;
+    --foreground: 260 10% 92%;
+    --card: 260 18% 10%;
+    --card-foreground: 260 10% 92%;
+    --popover: 260 18% 10%;
+    --popover-foreground: 260 10% 92%;
+    --primary: 270 70% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 260 15% 16%;
+    --secondary-foreground: 260 10% 85%;
+    --muted: 260 12% 18%;
+    --muted-foreground: 260 10% 55%;
+    --accent: 270 60% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 260 15% 18%;
+    --input: 260 15% 18%;
+    --ring: 270 70% 60%;
+    --radius: 0.75rem;
+
+    /* Novel-specific tokens */
+    --ai-block-bg: 270 60% 50%;
+    --ai-block-border: 270 50% 40%;
+    --tts-highlight: 45 100% 50%;
+    --editor-bg: 260 20% 8%;
+    --editor-border: 260 15% 15%;
+    --gradient-novel-1: 270 80% 55%;
+    --gradient-novel-2: 300 70% 45%;
+    --gradient-novel-3: 240 70% 55%;
+
+    /* Sidebar */
+    --sidebar-background: 260 20% 8%;
+    --sidebar-foreground: 260 10% 85%;
+    --sidebar-primary: 270 70% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 260 15% 16%;
+    --sidebar-accent-foreground: 260 10% 85%;
+    --sidebar-border: 260 15% 15%;
+    --sidebar-ring: 270 70% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Noto Sans KR', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Novel Editor Typography */
+.novel-editor-content {
+  font-family: 'Noto Serif KR', Georgia, serif;
+  line-height: 1.9;
+  letter-spacing: 0.02em;
+}
+
+.novel-editor-content::placeholder {
+  font-family: 'Noto Sans KR', sans-serif;
+  font-style: italic;
+  opacity: 0.3;
+}
+
+.font-gothic {
+  font-family: 'Noto Sans KR', sans-serif;
+}
+
+.font-serif-kr {
+  font-family: 'Noto Serif KR', Georgia, serif;
+}
+
+/* AI Text Block */
+.ai-text-block {
+  background: hsl(var(--ai-block-bg) / 0.08);
+  border: 1px solid hsl(var(--ai-block-bg) / 0.2);
+  border-radius: var(--radius);
+  animation: aiBlockFadeIn 0.5s ease-out;
+}
+
+@keyframes aiBlockFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    background: hsl(var(--ai-block-bg) / 0.15);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    background: hsl(var(--ai-block-bg) / 0.08);
+  }
+}
+
+/* TTS Sentence Highlight */
+.tts-highlight {
+  background: hsl(var(--tts-highlight) / 0.25);
+  border-radius: 2px;
+  transition: background 0.3s ease;
+}
+
+/* AI Corrected Text Highlight (fade out) */
+@keyframes fadeHighlight {
+  0% {
+    background: hsl(var(--primary) / 0.25);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+.fade-highlight {
+  animation: fadeHighlight 1.4s ease-out forwards;
+}
+
+/* Glassmorphism card */
+.glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--gradient-novel-1)),
+    hsl(var(--gradient-novel-2)),
+    hsl(var(--gradient-novel-3))
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Progress bar animation */
+.progress-fill {
+  transition: width 0.5s ease-out, background-color 0.5s ease;
+}
+
+/* Panel slide animation */
+.panel-slide-in {
+  animation: panelSlideIn 0.3s ease-out;
+}
+
+@keyframes panelSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.panel-slide-out {
+  animation: panelSlideOut 0.3s ease-in;
+}
+
+@keyframes panelSlideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Status badges */
+.badge-draft {
+  @apply bg-yellow-500/15 text-yellow-400 border border-yellow-500/25;
+}
+
+.badge-corrected {
+  @apply bg-blue-500/15 text-blue-400 border border-blue-500/25;
+}
+
+.badge-finalized {
+  @apply bg-emerald-500/15 text-emerald-400 border border-emerald-500/25;
+}
+
+.badge-in-progress {
+  @apply bg-blue-500/15 text-blue-400 border border-blue-500/25;
+}
+
+.badge-completed {
+  @apply bg-emerald-500/15 text-emerald-400 border border-emerald-500/25;
+}
+
+.badge-paused {
+  @apply bg-yellow-500/15 text-yellow-400 border border-yellow-500/25;
+}
+
+/* Timeline */
+.timeline-line {
+  @apply absolute left-4 top-0 bottom-0 w-px bg-gradient-to-b from-purple-500/50 via-purple-500/20 to-transparent;
+}
+
+.timeline-dot {
+  @apply relative z-10 w-3 h-3 rounded-full bg-purple-500 ring-4 ring-purple-500/20;
+}
+
+/* Scrollbar styling */
+.novel-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.novel-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.novel-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+
+.novel-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Editor glow effect */
+.editor-glow {
+  box-shadow: 0 0 0 1px hsl(var(--editor-border)),
+              0 0 20px hsl(var(--primary) / 0.05),
+              0 0 40px hsl(var(--primary) / 0.02);
+}
+
+.editor-glow:focus-within {
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3),
+              0 0 20px hsl(var(--primary) / 0.1),
+              0 0 40px hsl(var(--primary) / 0.05);
+}
+
+/* Streaming text animation */
+@keyframes streamingCursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.streaming-cursor::after {
+  content: '▋';
+  animation: streamingCursor 0.8s infinite;
+  color: hsl(var(--primary));
+}
+
+/* Genre gradient strips */
+.genre-fantasy { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+.genre-romance { background: linear-gradient(135deg, #ec4899, #f43f5e); }
+.genre-mystery { background: linear-gradient(135deg, #0ea5e9, #3b82f6); }
+.genre-sf { background: linear-gradient(135deg, #06b6d4, #22d3ee); }
+.genre-action { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+.genre-horror { background: linear-gradient(135deg, #1f2937, #4b5563); }
+.genre-daily { background: linear-gradient(135deg, #10b981, #34d399); }
+.genre-history { background: linear-gradient(135deg, #92400e, #b45309); }
+.genre-default { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
