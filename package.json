@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://puppin4031-tech.github.io/ai_pd/",
+  "homepage": "https://kimes92.github.io/ai_pd/",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
