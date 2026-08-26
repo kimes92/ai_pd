@@ -1,1 +1,3 @@
-export function useCharacterArcs(projectId: string) { return { getArcSummaries: () => [], isLoading: false }; }
+export function useCharacterArcs(projectId: string) {
+  return { getArcSummaries: () => [], isLoading: false };
+}
