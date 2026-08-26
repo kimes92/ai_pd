@@ -10,7 +10,7 @@ const callLocalAI = async (
   userPrompt: string,
   signal?: AbortSignal
 ): Promise<string> => {
-  const endpoint = "http://localhost:11434/v1/chat/completions";
+  const endpoint = "http://127.0.0.1:11434/v1/chat/completions";
   const payload = {
     model: "llama3",
     messages: [
@@ -307,20 +307,27 @@ export function useAutoWriterEngine(
   }, [autoState.isProcessing, runPipelineCycle]);
 
   // 자동 모드일 때 반복 실행 (30초 간격)
+  const runPipelineRef = useRef(runPipelineCycle);
   useEffect(() => {
-    if (!autoState.isAutoMode || !settings) return;
+    runPipelineRef.current = runPipelineCycle;
+  }, [runPipelineCycle]);
+
+  useEffect(() => {
+    if (!autoState.isAutoMode) return;
 
     // 즉시 1사이클 실행
-    runPipelineCycle();
+    if (!isRunningRef.current) {
+      runPipelineRef.current();
+    }
 
     const interval = setInterval(() => {
       if (!isRunningRef.current && autoState.isAutoMode) {
-        runPipelineCycle();
+        runPipelineRef.current();
       }
     }, 30000); // 30초마다 체크
 
     return () => clearInterval(interval);
-  }, [autoState.isAutoMode, settings]); // runPipelineCycle은 의도적으로 제외 (무한 재실행 방지)
+  }, [autoState.isAutoMode]); // 의존성에서 settings 제거하여 무한루프 방지
 
   // 사용자 피드백 추가
   const addFeedback = useCallback(
