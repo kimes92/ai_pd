@@ -17,7 +17,10 @@ import {
   Clock,
   AlertTriangle,
   Bot,
+  Settings,
+  Key,
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface AutoWriterPanelProps {
   autoState: AutoWriterState;
@@ -49,6 +52,18 @@ export function AutoWriterPanel({
 }: AutoWriterPanelProps) {
   const [feedbackEpId, setFeedbackEpId] = useState("");
   const [feedbackText, setFeedbackText] = useState("");
+  
+  // API 설정 상태
+  const [apiProvider, setApiProvider] = useState(localStorage.getItem("ai_provider") || "gemini");
+  const [apiKey, setApiKey] = useState(localStorage.getItem("ai_api_key") || "");
+  const [showApiSettings, setShowApiSettings] = useState(!localStorage.getItem("ai_api_key"));
+
+  const handleSaveApiSettings = () => {
+    localStorage.setItem("ai_provider", apiProvider);
+    localStorage.setItem("ai_api_key", apiKey);
+    toast.success("API 설정이 저장되었습니다.");
+    setShowApiSettings(false);
+  };
 
   const stepInfo = STEP_LABELS[autoState.currentStep] || STEP_LABELS.idle;
   const StepIcon = stepInfo.icon;
@@ -114,6 +129,58 @@ export function AutoWriterPanel({
             )}
             수동으로 1사이클 실행
           </Button>
+        )}
+
+        {/* API 설정 토글 버튼 */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowApiSettings(!showApiSettings)}
+          className="w-full text-xs h-8 text-muted-foreground border-border bg-background/50"
+        >
+          <Settings className="w-3.5 h-3.5 mr-1.5" />
+          AI 모델 및 API 키 설정
+        </Button>
+
+        {/* API 설정 패널 */}
+        {showApiSettings && (
+          <div className="p-4 rounded-xl bg-secondary/30 border border-border space-y-3 mt-2">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">AI 제공자</label>
+              <select
+                value={apiProvider}
+                onChange={(e) => setApiProvider(e.target.value)}
+                className="w-full bg-background/50 border border-border rounded-md text-xs p-2 text-foreground"
+              >
+                <option value="gemini">Google Gemini (추천)</option>
+                <option value="openai">OpenAI (ChatGPT)</option>
+                <option value="local">Local AI (Ollama - 로컬 전용)</option>
+              </select>
+            </div>
+            
+            {apiProvider !== "local" && (
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">API 키</label>
+                <div className="relative">
+                  <Key className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                  <input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="API 키를 입력하세요"
+                    className="w-full bg-background/50 border border-border rounded-md text-xs p-2 pl-8 text-foreground"
+                  />
+                </div>
+              </div>
+            )}
+            
+            <Button
+              onClick={handleSaveApiSettings}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8"
+            >
+              저장하기
+            </Button>
+          </div>
         )}
 
         {/* 현재 진행 상태 표시 */}

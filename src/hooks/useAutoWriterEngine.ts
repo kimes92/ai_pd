@@ -3,13 +3,65 @@ import { NovelSettings, PipelineLog, UserFeedback, AiNote } from "./useStoryCont
 import { NovelEpisode } from "./useNovelEpisode";
 
 /**
- * 로컬 AI(Ollama)를 직접 호출하는 유틸리티 함수
+ * AI API를 호출하는 유틸리티 함수 (로컬, Gemini, OpenAI 지원)
  */
-const callLocalAI = async (
+const callAI = async (
   systemPrompt: string,
   userPrompt: string,
   signal?: AbortSignal
 ): Promise<string> => {
+  const provider = localStorage.getItem("ai_provider") || "gemini";
+  const apiKey = localStorage.getItem("ai_api_key") || "";
+
+  if (provider === "gemini") {
+    if (!apiKey) throw new Error("Gemini API 키가 설정되지 않았습니다.");
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`;
+    const payload = {
+      system_instruction: { parts: { text: systemPrompt } },
+      contents: [{ parts: [{ text: userPrompt }] }],
+      generationConfig: { temperature: 0.7 },
+    };
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) throw new Error(`Gemini API error ${response.status}`);
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+  } 
+  
+  if (provider === "openai") {
+    if (!apiKey) throw new Error("OpenAI API 키가 설정되지 않았습니다.");
+    const endpoint = "https://api.openai.com/v1/chat/completions";
+    const payload = {
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.7,
+    };
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) throw new Error(`OpenAI API error ${response.status}`);
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content?.trim() || "";
+  }
+
+  // 로컬 AI (Ollama)
   const endpoint = "http://127.0.0.1:11434/v1/chat/completions";
   const payload = {
     model: "llama3",
@@ -22,16 +74,13 @@ const callLocalAI = async (
 
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer local-ai-key-not-required",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     signal,
   });
 
   if (!response.ok) {
-    throw new Error(`AI API error ${response.status}`);
+    throw new Error(`Local AI API error ${response.status}`);
   }
 
   const data = await response.json();
@@ -181,7 +230,7 @@ export function useAutoWriterEngine(
 
       if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
-      const generatedDraft = await callLocalAI(mainWriterSystem, mainWriterUser, controller.signal);
+      const generatedDraft = await callAI(mainWriterSystem, mainWriterUser, controller.signal);
 
       if (!generatedDraft) {
         addLog("error", "메인작가 AI", "초안 텍스트 생성 실패");
@@ -200,7 +249,7 @@ export function useAutoWriterEngine(
 
       const reviewerUser = `${context}\n[방금 작성된 초안]\n${generatedDraft}\n\n위 초안의 개연성, 인물 일관성, 스토리 흐름을 검토하고 구체적인 수정 방향(피드백)을 제공해 주세요.`;
 
-      const reviewResult = await callLocalAI(reviewerSystem, reviewerUser, controller.signal);
+      const reviewResult = await callAI(reviewerSystem, reviewerUser, controller.signal);
       addLog("step2-done", "검수작가 AI", reviewResult ? `분석 완료: ${reviewResult.substring(0, 100)}...` : "분석 완료");
 
       // ──────── STEP 3: 메인작가 AI ─ 교정 및 보완 (Revision) ────────
@@ -213,7 +262,7 @@ export function useAutoWriterEngine(
       
       const revisionUser = `[원본 초안]\n${generatedDraft}\n\n[검수작가 피드백]\n${reviewResult}\n\n위 피드백을 반영하여 원본 초안을 수정하고 보완한 최종 텍스트를 작성해 주세요.`;
 
-      const revisedText = await callLocalAI(revisionSystem, revisionUser, controller.signal);
+      const revisedText = await callAI(revisionSystem, revisionUser, controller.signal);
       const finalGeneratedText = revisedText || generatedDraft;
 
       addLog("step3-done", "메인작가 AI", `보완 및 수정 완료! (${finalGeneratedText.length}자)`);
@@ -232,7 +281,7 @@ export function useAutoWriterEngine(
 
       const arcWriterUser = `${context}\n[방금 확정된 텍스트]\n${finalGeneratedText}\n\n위 텍스트에서 인물별 변화를 추출하여 아크 업데이트 노트를 작성해 주세요.`;
 
-      const arcUpdate = await callLocalAI(arcWriterSystem, arcWriterUser, controller.signal);
+      const arcUpdate = await callAI(arcWriterSystem, arcWriterUser, controller.signal);
       addLog("step4-done", "설정관리 AI", arcUpdate ? `아크 업데이트 완료: ${arcUpdate.substring(0, 100)}...` : "아크 업데이트 완료");
 
       // ──────── STEP 4: 결과 저장 ────────
@@ -381,7 +430,7 @@ export function useAutoWriterEngine(
         const system = `당신은 사용자의 피드백을 반영하여 기존 소설 본문을 수정하는 '편집 작가 AI'입니다.\n\n[규칙]\n- 사용자의 피드백 지시를 정확히 반영하되, 전체 스토리 흐름은 최대한 유지하세요.\n- 기존 내용에서 피드백과 관련된 부분만 수정/강화하고 나머지는 보존하세요.\n- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기\n\n**IMPORTANT: 반드시 한국어(Korean)로만 출력하세요.**`;
         const user = `${context}\n[현재 에피소드 전체 내용]\n${targetEp.content}\n\n[사용자 피드백 지시사항]\n${fb.instruction}\n\n위 에피소드 내용에서 사용자 피드백을 반영하여 수정된 전체 에피소드 내용을 출력해 주세요. 피드백과 무관한 부분은 최대한 원문을 유지하세요.`;
 
-        const result = await callLocalAI(system, user);
+        const result = await callAI(system, user);
         if (result) {
           await updateEpisode(targetEp.id, { content: result });
           const updatedFb = (settings.user_feedbacks || []).map((f) =>
