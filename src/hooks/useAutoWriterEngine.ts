@@ -63,7 +63,7 @@ const callAI = async (
   }
 
   // 로컬 AI (Ollama)
-  const endpoint = "http://127.0.0.1:11434/v1/chat/completions";
+  const endpoint = "http://localhost:11434/v1/chat/completions";
   const payload = {
     model: localModel,
     messages: [
