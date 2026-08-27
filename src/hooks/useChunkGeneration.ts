@@ -75,42 +75,83 @@ const fetchAI = async (
     throw new Error(`Unsupported action: ${action}`);
   }
 
-  // 사용자 요청에 따라 로컬 AI(Ollama 등) 우선 연결 (API 키 불필요)
-  const useLocalAI = true;
-  
-  let model = "llama3"; // 로컬 AI 모델명 (Ollama에 설치된 모델명과 일치해야 함)
-  let endpoint = "http://localhost:11434/v1/chat/completions";
-  let apiKey = "local-ai-key-not-required";
+  const provider = localStorage.getItem("ai_provider") || "local";
+  const apiKey = localStorage.getItem("ai_api_key") || "";
+  const localModel = localStorage.getItem("ai_local_model") || "llama3";
 
-  if (!useLocalAI) {
-    model = "google/gemini-2.5-flash";
-    endpoint = "https://ai.gateway.lovable.dev/v1/chat/completions";
-    apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-    if (!apiKey) throw new Error('Supabase publishable key is missing.');
+  if (provider === "gemini") {
+    if (!apiKey) throw new Error("Gemini API 키가 설정되지 않았습니다.");
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`;
+    const payload = {
+      system_instruction: { parts: { text: systemPrompt } },
+      contents: [{ parts: [{ text: userPrompt }] }],
+      generationConfig: { temperature: 0.7 },
+    };
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) throw new Error(`Gemini API error ${response.status}`);
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
   }
 
+  if (provider === "openai") {
+    if (!apiKey) throw new Error("OpenAI API 키가 설정되지 않았습니다.");
+    const endpoint = "https://api.openai.com/v1/chat/completions";
+    const payload = {
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.7,
+      frequency_penalty: 0.5,
+      presence_penalty: 0.5,
+    };
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) throw new Error(`OpenAI API error ${response.status}`);
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content?.trim() || "";
+  }
+
+  // 로컬 AI (Ollama)
+  const endpoint = "http://localhost:11434/v1/chat/completions";
   const payload = {
-    model,
+    model: localModel,
     messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
     ],
     temperature: 0.7,
+    frequency_penalty: 1.0,
+    presence_penalty: 1.0,
   };
 
   const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     signal,
   });
 
   if (!response.ok) {
     const txt = await response.text();
-    throw new Error(`AI API error ${response.status}: ${txt}`);
+    throw new Error(`Local AI API error ${response.status}: ${txt}`);
   }
   const data = await response.json();
   return data.choices?.[0]?.message?.content?.trim() || '';
