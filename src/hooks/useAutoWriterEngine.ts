@@ -70,7 +70,9 @@ const callAI = async (
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    temperature: 0.7,
+    temperature: 0.85,
+    frequency_penalty: 1.15,
+    presence_penalty: 1.1,
   };
 
   const response = await fetch(endpoint, {
@@ -206,10 +208,11 @@ export function useAutoWriterEngine(
 
       const context = buildContext(settings, episodes);
 
-      // ──────── STEP 1: 메인작가 AI ─ 초안 작성 ────────
-      addLog("step1", "메인작가 AI", "초안 작성 시작 (~3000자)...");
-
-      const mainWriterSystem = `당신은 총괄 집필을 담당하는 '메인작가 AI'입니다.\n\n[규칙]\n- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기\n- 주요 인물 외에도 상황에 맞는 엑스트라·조연을 자유롭게 삽입\n- 문체 가이드는 절대 복사하지 말고 톤과 호흡만 학습 적용\n\n**IMPORTANT: 반드시 한국어(Korean)로만 출력하세요.**`;
+      // ──────── STEP 1: 메인작가 AI ─ 초안 집필 (Draft) ────────
+      addLog("step1", "메인작가 AI", "문맥을 분석하고 초안을 작성 중입니다...");
+      
+      const strictRules = `\n[웹소설 전용 제약 조건]\n- 이전 문장에서 썼던 비유나 묘사 단어의 재사용을 엄격히 금지합니다.\n- 상투적인 표현(예: '가슴이 웅장해진다', '묘한 미소를 지었다' 등)을 배제하고 구체적인 행동과 대사 위주로 서술하세요.\n- 주인공의 내면 독백이 3문단 이상 길어지지 않도록 즉시 사건이나 갈등 상황으로 전환하세요.`;
+      const mainWriterSystem = `당신은 총괄 집필을 담당하는 '메인작가 AI'입니다.\n\n[규칙]\n- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기\n- 주요 인물 외에도 상황에 맞는 엑스트라·조연을 자유롭게 삽입\n- 문체 가이드는 절대 복사하지 말고 톤과 호흡만 학습 적용${strictRules}\n\n**IMPORTANT: 반드시 한국어(Korean)로만 출력하세요.**`;
 
       const currentContent = targetEpisode.content || "";
       const recentContent = currentContent.length > 2000 ? currentContent.slice(-2000) : currentContent;
@@ -259,7 +262,7 @@ export function useAutoWriterEngine(
       setAutoState((prev) => ({ ...prev, currentStep: "revising" }));
       addLog("step3", "메인작가 AI", "검수 결과를 바탕으로 초안 보완 및 수정 중...");
 
-      const revisionSystem = `당신은 검수 피드백을 바탕으로 글을 완벽하게 다듬는 '메인작가 AI (교정 모드)'입니다.\n\n[규칙]\n- 주어진 초안과 검수 피드백을 모두 읽고, 피드백의 지적 사항을 반영하여 초안을 수정하세요.\n- 수정된 최종 결과물만 출력하세요. (인사말, 설명 등 불필요한 말 금지)\n- 분량은 3000자 이내로 유지하고, 문맥이 부자연스럽게 끊기지 않도록 매끄럽게 연결하세요.\n\n**IMPORTANT: 반드시 한국어(Korean)로만 최종 소설 텍스트를 출력하세요.**`;
+      const revisionSystem = `당신은 검수작가의 피드백을 반영하여 원본을 고쳐쓰는 '메인작가 AI'입니다.\n\n[규칙]\n- 피드백에서 지적된 개연성 오류나 OOC(캐릭터 붕괴)를 완벽히 수정하세요.\n- 문체 가이드는 톤과 호흡만 학습하며 절대 복사하지 마세요.${strictRules}\n\n**IMPORTANT: 반드시 한국어(Korean)로만 출력하세요.**`;
       
       const revisionUser = `[원본 초안]\n${generatedDraft}\n\n[검수작가 피드백]\n${reviewResult}\n\n위 피드백을 반영하여 원본 초안을 수정하고 보완한 최종 텍스트를 작성해 주세요.`;
 
