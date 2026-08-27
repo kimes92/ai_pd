@@ -54,14 +54,16 @@ export function AutoWriterPanel({
   const [feedbackText, setFeedbackText] = useState("");
   
   // API 설정 상태
-  const [apiProvider, setApiProvider] = useState(localStorage.getItem("ai_provider") || "gemini");
+  const [apiProvider, setApiProvider] = useState(localStorage.getItem("ai_provider") || "local");
   const [apiKey, setApiKey] = useState(localStorage.getItem("ai_api_key") || "");
-  const [showApiSettings, setShowApiSettings] = useState(!localStorage.getItem("ai_api_key"));
+  const [localModel, setLocalModel] = useState(localStorage.getItem("ai_local_model") || "llama3");
+  const [showApiSettings, setShowApiSettings] = useState(!localStorage.getItem("ai_api_key") && !localStorage.getItem("ai_provider"));
 
   const handleSaveApiSettings = () => {
     localStorage.setItem("ai_provider", apiProvider);
     localStorage.setItem("ai_api_key", apiKey);
-    toast.success("API 설정이 저장되었습니다.");
+    localStorage.setItem("ai_local_model", localModel);
+    toast.success("AI 설정이 저장되었습니다.");
     setShowApiSettings(false);
   };
 
@@ -152,13 +154,30 @@ export function AutoWriterPanel({
                 onChange={(e) => setApiProvider(e.target.value)}
                 className="w-full bg-background/50 border border-border rounded-md text-xs p-2 text-foreground"
               >
-                <option value="gemini">Google Gemini (추천)</option>
+                <option value="local">Local AI (Ollama - 로컬 서버 전용)</option>
+                <option value="gemini">Google Gemini (클라우드)</option>
                 <option value="openai">OpenAI (ChatGPT)</option>
-                <option value="local">Local AI (Ollama - 로컬 전용)</option>
               </select>
             </div>
             
-            {apiProvider !== "local" && (
+            {apiProvider === "local" ? (
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">로컬 AI 모델명</label>
+                <div className="relative">
+                  <Bot className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={localModel}
+                    onChange={(e) => setLocalModel(e.target.value)}
+                    placeholder="예: llama3, gemma 등"
+                    className="w-full bg-background/50 border border-border rounded-md text-xs p-2 pl-8 text-foreground"
+                  />
+                </div>
+                <p className="text-[10px] text-amber-500/80 mt-1.5 ml-1">
+                  ⚠️ 로컬 AI를 사용하려면 반드시 `npm run dev`를 통해 실행한 로컬 주소(http://localhost:8080)로 접속해야 합니다.
+                </p>
+              </div>
+            ) : (
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">API 키</label>
                 <div className="relative">

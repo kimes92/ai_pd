@@ -10,8 +10,9 @@ const callAI = async (
   userPrompt: string,
   signal?: AbortSignal
 ): Promise<string> => {
-  const provider = localStorage.getItem("ai_provider") || "gemini";
+  const provider = localStorage.getItem("ai_provider") || "local";
   const apiKey = localStorage.getItem("ai_api_key") || "";
+  const localModel = localStorage.getItem("ai_local_model") || "llama3";
 
   if (provider === "gemini") {
     if (!apiKey) throw new Error("Gemini API 키가 설정되지 않았습니다.");
@@ -64,7 +65,7 @@ const callAI = async (
   // 로컬 AI (Ollama)
   const endpoint = "http://127.0.0.1:11434/v1/chat/completions";
   const payload = {
-    model: "llama3",
+    model: localModel,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
