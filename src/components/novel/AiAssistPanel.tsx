@@ -143,12 +143,14 @@ interface AiOutputPanelProps {
   generatedText: string;
   isGenerating: boolean;
   onInsertText: (text: string) => void;
+  onDirectMerge?: (text: string) => void;
 }
 
 export function AiOutputPanel({
   generatedText,
   isGenerating,
   onInsertText,
+  onDirectMerge,
 }: AiOutputPanelProps) {
   return (
     <div className="flex-1 p-4 flex flex-col h-full overflow-hidden bg-black/10 shrink-0">
@@ -177,15 +179,26 @@ export function AiOutputPanel({
         )}
       </div>
 
-      {/* 본문 삽입 버튼 */}
+      {/* 본문 삽입 및 바로 병합 버튼 */}
       {generatedText && !isGenerating && (
-        <div className="shrink-0 mt-3">
+        <div className="shrink-0 mt-3 space-y-1.5">
+          {onDirectMerge && (
+            <Button
+              onClick={() => onDirectMerge(generatedText)}
+              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs gap-1.5 shadow-md py-3 font-bold"
+            >
+              <Send className="w-4 h-4" />
+              ✨ 본문 끝에 바로 합치기 (추천)
+            </Button>
+          )}
+
           <Button
+            variant="outline"
             onClick={() => onInsertText(generatedText)}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs gap-1.5 shadow-md py-4"
+            className="w-full border-purple-500/30 text-purple-300 hover:bg-purple-500/10 text-xs gap-1.5 py-2.5"
           >
-            <Send className="w-4 h-4" />
-            <span className="font-bold">본문에 삽입하기</span>
+            <Sparkles className="w-3.5 h-3.5" />
+            📦 임시 검토 블록으로 넣기
           </Button>
         </div>
       )}

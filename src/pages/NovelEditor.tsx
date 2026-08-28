@@ -159,13 +159,21 @@ export default function NovelEditor() {
     });
   };
 
+  // Direct merge generated AI text to main editor content
+  const handleDirectMergeText = (generatedText: string) => {
+    if (!generatedText.trim()) return;
+    setContent((prev) => (prev ? prev + "\n\n" + generatedText : generatedText));
+    resetChunk();
+    toast.success("✨ AI 생성 내용이 본문 끝에 바로 병합되었습니다!");
+  };
+
   // Insert generated AI text as an interactive AI Block
   const handleInsertAiText = (generatedText: string) => {
     if (!generatedText.trim()) return;
     const blockId = Date.now().toString();
     setAiBlocks((prev) => [...prev, { id: blockId, text: generatedText }]);
     resetChunk();
-    toast.success("AI 생성 블록이 본문에 삽입되었습니다 (수정/확정 가능)");
+    toast.success("AI 생성 블록이 임시 검토 목록에 추가되었습니다");
   };
 
   // AI Block Confirm (merge into main content)
@@ -487,6 +495,7 @@ export default function NovelEditor() {
                 generatedText={chunkState.generatedText}
                 isGenerating={chunkState.isGenerating}
                 onInsertText={handleInsertAiText}
+                onDirectMerge={handleDirectMergeText}
               />
             </div>
           </>
