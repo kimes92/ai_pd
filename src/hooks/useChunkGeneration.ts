@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { callAI } from '@/lib/aiHelper';
 
 export interface ChunkState {
   isGenerating: boolean;
@@ -64,109 +65,57 @@ const fetchAI = async (
     ? `[현재 에피소드 내용]\n...${currentText.slice(-2000)}`
     : `[현재 에피소드 내용]\n(아직 작성된 본문 텍스트가 없습니다. 이번 에피소드의 시작입니다.)`;
 
+  if (action === 'continue') {
+    // Phase 1: 작가1 AI → 개연성 점검 및 스토리 아이디어 뼈대 설계
+    const writer1System = `당신은 스토리 구조와 개연성을 담당하는 '작가1 AI (아이디어 닥터)'입니다.
+이전 에피소드 요약 및 현재 회차 맥락을 분석하여, 다음 전개의 개연성을 점검하고 사건의 흥미진진한 핵심 아이디어 뼈대를 설계하세요.
+
+**반드시 100% 한국어로만 개연성과 아이디어 뼈대만 출력하세요. 영문이나 메타 텍스트는 절대 금지합니다.**`;
+
+    const writer1User = `${context}\n${textSnippet}\n${direction ? `[유저 지시사항]\n${direction}\n` : ''}다음 장면에 대한 개연성 점검과 스토리 아이디어 뼈대를 3문장으로 간결하게 설계하세요.`;
+
+    let writer1Plan = '';
+    try {
+      writer1Plan = await callAI(writer1System, writer1User, signal);
+    } catch {
+      writer1Plan = '주인공의 결단과 인물 간 갈등을 심화시키는 서사 전개';
+    }
+
+    // Phase 2: 메인작가 AI → 3000자 순수 소설 본문 작문
+    const mainWriterSystem = `당신은 총괄 집필을 담당하는 '메인작가 AI'입니다.
+작가1 AI가 설계한 개연성 및 스토리 아이디어 뼈대를 바탕으로, 생생하고 몰입감 넘치는 소설 본문(~3000자)을 작문하세요.
+
+[규칙]
+- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기
+- 문체 가이드는 톤과 호흡만 학습 적용${strictRules}
+
+**절대로 영어나 설명문, 메타 텍스트를 출력하지 말고 100% 한국어 순수 소설 본문만 출력하세요.**`;
+
+    const mainWriterUser = `${context}\n${textSnippet}\n[작가1 AI의 개연성 & 스토리 아이디어 뼈대]\n${writer1Plan}\n${direction ? `[유저 지시사항]\n${direction}\n` : ''}위 작가1의 청사진을 바탕으로 소설 본문을 풍부하게 작성해 주세요.`;
+
+    return await callAI(mainWriterSystem, mainWriterUser, signal);
+  }
+
   let systemPrompt = '';
   let userPrompt = '';
-  if (action === 'continue') {
-    systemPrompt = `당신은 총괄 집필을 담당하는 '메인작가 AI'입니다.\n\n[규칙]\n- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기\n- 주요 인물 외에도 상황에 맞는 엑스트라·조연을 자유롭게 삽입\n- 문체 가이드는 절대 복사하지 말고 톤과 호흡만 학습 적용${strictRules}\n\n**절대로 영어나 설명문을 출력하지 말고 100% 한국어 순수 소설 본문만 출력하세요.**`;
-    userPrompt = `${context}\n${textSnippet}\n`;
-    if (direction) userPrompt += `[유저 지시사항]\n${direction}\n`;
-    userPrompt += `위 정보와 시놉시스를 바탕으로 약 3000자 분량의 소설 이야기를 작성해 주세요.`;
-  } else if (action === 'dialogue') {
-    systemPrompt = `당신은 인물 대화 전담 AI 입니다. 등장인물들의 고유 말투와 성격을 생생하게 반영해 입체적인 대화 장면을 작성하세요.\n\n[규칙] 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기${strictRules}\n\n**절대로 영어나 설명문을 출력하지 말고 100% 한국어 순수 소설 대화 장면만 출력하세요.**`;
-    userPrompt = `${context}\n${textSnippet}\n\n[대화 상황/지시]\n${direction || '현재 등장인물들의 성격과 관계에 어울리는 대화 씬을 생성해 주세요.'}`;
+
+  if (action === 'dialogue') {
+    systemPrompt = `당신은 총괄 집필 메인작가 AI (대화 전담) 입니다. 등장인물들의 고유 말투와 성격을 생생하게 반영해 입체적인 대화 장면을 작성하세요.\n\n[규칙] 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기${strictRules}\n\n**절대로 영어나 설명문을 출력하지 말고 100% 한국어 순수 소설 대화 장면만 출력하세요.**`;
+    userPrompt = `${context}\n${textSnippet}\n\n[대화 상황/지시]\n${direction || '현재 등장인물들의 성격과 관계에 어울리는 생생한 대화 씬을 생성해 주세요.'}`;
   } else if (action === 'suggest') {
-    systemPrompt = `당신은 스토리 구성을 돕는 '작가1 AI (아이디어 닥터)'입니다.\n\n[규칙]\n- 절대로 영어나 영문 타이틀(Here are three scene ideas..., Scene Idea 1 등)을 출력하지 마세요.\n- 100% 자연스러운 한국어(Korean)로만 다음 장면 아이디어 3가지를 1), 2), 3) 번호로 구체적이고 흥미진진하게 제안하세요.`;
+    systemPrompt = `당신은 스토리 구성을 돕는 '작가1 AI (스토리 닥터)'입니다.\n\n[규칙]\n- 절대로 영어나 영문 타이틀(Here are three scene ideas..., Scene Idea 1 등)을 출력하지 마세요.\n- 100% 자연스러운 한국어(Korean)로만 다음 장면 아이디어 3가지를 1), 2), 3) 번호로 구체적이고 흥미진진하게 제안하세요.`;
     userPrompt = `${context}\n${textSnippet}\n\n[지시사항]\n${direction || '스토리를 극적으로 이끌어갈 다음 장면 아이디어 3개를 제안해 주세요.'}`;
   } else if (action === 'rewrite') {
     systemPrompt = `당신은 재작성 전담 AI 입니다. 선택된 텍스트를 시놉시스와 인물 말투에 맞게 더 풍부하고 감각적인 문장으로 바꾸세요.${strictRules}\n\n**절대로 영어나 설명문을 출력하지 말고 100% 한국어 순수 소설 본문만 출력하세요.**`;
     userPrompt = `${context}\n[원본 텍스트]\n${selectedText}\n\n[지시사항]\n${direction}\n\n위 텍스트를 재작성해 주세요.`;
   } else if (action === 'feedback-rewrite') {
-    systemPrompt = `당신은 사용자의 피드백을 반영하여 기존 소설 본문을 수정하는 '편집 작가 AI'입니다.\n\n[규칙]\n- 사용자의 피드백 지시를 정확히 반영하되, 전체 스토리 흐름은 최대한 유지하세요.\n- 기존 내용에서 피드백과 관련된 부분만 수정/강화하고 나머지는 보존하세요.\n- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기${strictRules}\n\n**절대로 영어나 설명문을 출력하지 말고 100% 한국어 순수 소설 본문만 출력하세요.**`;
+    systemPrompt = `당신은 사용자의 피드백을 반영하여 기존 소설 본문을 수정하는 '메인작가 AI (편집 모드)'입니다.\n\n[규칙]\n- 사용자의 피드백 지시를 정확히 반영하되, 전체 스토리 흐름은 최대한 유지하세요.\n- 기존 내용에서 피드백과 관련된 부분만 수정/강화하고 나머지는 보존하세요.\n- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기${strictRules}\n\n**절대로 영어나 설명문을 출력하지 말고 100% 한국어 순수 소설 본문만 출력하세요.**`;
     userPrompt = `${context}\n[현재 에피소드 전체 내용]\n${currentText}\n\n[사용자 피드백 지시사항]\n${direction}\n\n위 에피소드 내용에서 사용자 피드백을 반영하여 수정된 전체 에피소드 내용을 출력해 주세요. 피드백과 무관한 부분은 최대한 원문을 유지하세요.`;
   } else {
     throw new Error(`Unsupported action: ${action}`);
   }
 
-  const provider = localStorage.getItem("ai_provider") || "local";
-  const apiKey = localStorage.getItem("ai_api_key") || "";
-  const localModel = localStorage.getItem("ai_local_model") || "llama3";
-
-  if (provider === "gemini") {
-    if (!apiKey) throw new Error("Gemini API 키가 설정되지 않았습니다.");
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`;
-    const payload = {
-      system_instruction: { parts: { text: systemPrompt } },
-      contents: [{ parts: [{ text: userPrompt }] }],
-      generationConfig: { temperature: 0.7 },
-    };
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal,
-    });
-
-    if (!response.ok) throw new Error(`Gemini API error ${response.status}`);
-    const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-  }
-
-  if (provider === "openai") {
-    if (!apiKey) throw new Error("OpenAI API 키가 설정되지 않았습니다.");
-    const endpoint = "https://api.openai.com/v1/chat/completions";
-    const payload = {
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.7,
-      frequency_penalty: 0.5,
-      presence_penalty: 0.5,
-    };
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(payload),
-      signal,
-    });
-
-    if (!response.ok) throw new Error(`OpenAI API error ${response.status}`);
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content?.trim() || "";
-  }
-
-  // 로컬 AI (Ollama)
-  const endpoint = "http://localhost:11434/v1/chat/completions";
-  const payload = {
-    model: localModel,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    temperature: 0.85,
-    frequency_penalty: 1.15,
-    presence_penalty: 1.1,
-  };
-
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    signal,
-  });
-
-  if (!response.ok) {
-    const txt = await response.text();
-    throw new Error(`Local AI API error ${response.status}: ${txt}`);
-  }
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content?.trim() || '';
+  return await callAI(systemPrompt, userPrompt, signal);
 };
 
 export function useChunkGeneration() {
@@ -218,6 +167,16 @@ export function useChunkGeneration() {
           currentChunk: prev.currentChunk + 1,
         }));
         return result;
+      } catch (err: any) {
+        if (err.name === 'AbortError') return null;
+        console.error('AI call error:', err);
+        setState(prev => ({
+          ...prev,
+          isGenerating: false,
+          error: err.message || 'AI 생성에 실패했습니다.',
+        }));
+        return null;
+      }
       } catch (err: any) {
         if (err.name === 'AbortError') {
           console.log('생성이 취소되었습니다');

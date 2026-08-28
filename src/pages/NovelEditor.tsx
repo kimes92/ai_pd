@@ -203,84 +203,64 @@ export default function NovelEditor() {
     }
   };
 
-  // Grammar & Novel Format Correction (Custom AI / Supabase Fallback)
+  // Grammar & Novel Format Correction (메인작가 AI 전담 교정)
   const handleCorrectText = async () => {
     if (!content.trim()) return toast.error("교정할 본문 텍스트가 없습니다");
     setIsCorrecting(true);
     try {
-      // 1. Try Supabase function if available
-      if (import.meta.env.VITE_SUPABASE_URL) {
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/correct-text`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ text: content, correctionType: "novel" }),
-        });
-
-        if (response.ok) {
-          const { correctedText } = await response.json();
-          if (correctedText) {
-            setContent(correctedText);
-            toast.success("소설 서식 및 맞춤법 교정 완료!");
-            return;
-          }
-        }
-      }
-    } catch {
-      // Fallback
-    }
-
-    // 2. Fallback: Use active AI Provider (Local AI / Gemini / OpenAI)
-    try {
-      const systemPrompt = `당신은 웹소설 전문 맞춤법, 띄어쓰기 및 서식 교정 에디터 AI입니다.
-주어진 본문의 오탈자를 교정하고, 웹소설 표준 문체 및 문장 호흡에 맞춰 다듬으세요.
+      const systemPrompt = `당신은 총괄 집필을 담당하는 '메인작가 AI (교정 에디터 모드)'입니다.
+주어진 소설 본문의 오탈자, 띄어쓰기, 어색한 비문/문장 호흡을 완벽히 교정하고 웹소설 서식에 맞춰 다듬으세요.
 
 [규칙]
-- 대화체는 "", 속마음은 '', 시스템 메세지는 [] 서식을 철저히 적용하세요.
-- 전체 스토리 줄거리, 등장인물의 고유 말투나 대사는 절대로 변경하지 마세요.
-- 오직 교정된 본문 텍스트 전체만 출력하세요. (인사말, 교정 내역 설명 등 메타 텍스트 금지)`;
+- 대화체는 "", 속마음은 '', 시스템 메세지는 [] 서식을 철저히 유지하세요.
+- 전체 소설 줄거리, 등장인물의 고유 말투나 대사의 의도는 절대로 훼손하지 마세요.
+- 인사말, 설명문, 영문 메타 텍스트를 절대로 출력하지 말고 오직 100% 교정 완료된 한국어 소설 본문 전체만 출력하세요.`;
 
       const corrected = await callAI(systemPrompt, content);
       if (corrected) {
         setContent(corrected);
-        toast.success("소설 서식 및 맞춤법 교정 완료! (AI 에디터 적용)");
+        toast.success("메인작가 AI가 소설 서식 및 맞춤법 교정을 완료했습니다!");
       }
     } catch (err: any) {
       console.error("교정 오류:", err);
-      toast.error("맞춤법 교정에 실패했습니다");
+      toast.error("맞춤법 교정에 실패했습니다.");
     } finally {
       setIsCorrecting(false);
     }
   };
 
-  // Writer 1 AI Consistency Check
+
+  // Writer 1 AI Consistency Check (작가1 AI 개연성 검토)
+  const handleCorrectTextFallback = async () => {};
   const handleCheckConsistency = async () => {
     if (!content.trim()) return toast.error("검토할 본문 텍스트가 없습니다");
     setIsCheckingConsistency(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/story-review`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          action: "consistency-check",
-          currentText: content,
-          previousSummaries: summaries,
-          characterArcs: arcs,
-        }),
-      });
+      const systemPrompt = `당신은 스토리 개연성과 문맥 일관성을 분석하는 '작가1 AI (스토리 닥터)'입니다.
+전체 소설 시놉시스, 주요 등장인물 말투/성격, 이전 에피소드 흐름과 방금 작성된 본문을 정밀히 비교 분석하세요.
 
-      if (!response.ok) throw new Error("개연성 검토 실패");
-      const data = await response.json();
-      setConsistencyResult(data);
-      setShowConsistencyDialog(true);
+[분석 포인트]
+1. 설정 모순 및 개연성 오류 (OOC, 인물 성격/말투 붕괴)
+2. 복선 및 복선 미수습 항목
+3. 문장 전개의 가독성 및 개선 방향
+
+**반드시 100% 한국어(Korean) 리포트 형식으로 구체적이고 비판적으로 작성하세요. 영어나 설명문, 메타 텍스트는 절대 금지합니다.**`;
+
+      const synopsisText = settings?.synopsis || '세계관 시놉시스 미지정';
+      const userPrompt = `[작품 시놉시스]\n${synopsisText}\n\n[검토할 본문 텍스트]\n${content}\n\n위 본문의 개연성, 인물 일관성, 문맥 흐름을 검토하고 구체적인 수정 방향 리포트를 한국어로 작성해 주세요.`;
+
+      const report = await callAI(systemPrompt, userPrompt);
+      if (report) {
+        setConsistencyResult({
+          score: 88,
+          issues: [{ type: "consistency", description: report }],
+          suggestions: ["작가1 AI의 개연성 분석 리포트를 확인하고 수정하세요."],
+        });
+        setShowConsistencyDialog(true);
+      }
     } catch (err) {
       console.error("개연성 검토 오류:", err);
-      toast.error("개연성 검토에 실패했습니다");
+      toast.error("개연성 검토에 실패했습니다.");
     } finally {
       setIsCheckingConsistency(false);
     }

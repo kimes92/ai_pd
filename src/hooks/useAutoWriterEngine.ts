@@ -208,9 +208,9 @@ export function useAutoWriterEngine(
 
       const context = buildContext(settings, episodes);
 
-      // ──────── STEP 1: 메인작가 AI ─ 초안 집필 (Draft) ────────
-      addLog("step1", "메인작가 AI", "문맥을 분석하고 초안을 작성 중입니다...");
-      
+      // ──────── STEP 1: 작가2 AI & 작가1 AI ─ 인물관계 분석 및 플롯 구조 설계 ────────
+      addLog("step1", "작가2 & 작가1 AI", "인물 관계를 분석하고 에피소드 개연성/구조를 설계 중...");
+
       const strictRules = `
 [웹소설 전용 최고 지침]
 1. 오직 순수한 소설 본문 문장만 출력하세요. (인사말, 챕터/에피소드 제목, 캐릭터 설명, 서론/결론 요약, 영문 설명문 등 어떠한 메타 텍스트나 부연 설명도 절대로 포함하지 마세요.)
@@ -219,7 +219,50 @@ export function useAutoWriterEngine(
 4. 이전 문장에서 사용했던 동일한 비유, 묘사, 단어, 상황의 무한 반복을 완벽히 차단하세요.
 5. 상투적인 표현을 배제하고 구체적인 인물의 행동, 감정선, 대사 위주로 전개하세요.
 6. 주인공의 내면 독백이 3문단 이상 길어지지 않도록 즉시 외부 사건이나 갈등 상황으로 전환하세요.`;
-      const mainWriterSystem = `당신은 총괄 집필을 담당하는 '메인작가 AI'입니다.\n\n[규칙]\n- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기\n- 주요 인물 외에도 상황에 맞는 엑스트라·조연을 자유롭게 삽입\n- 문체 가이드는 절대 복사하지 말고 톤과 호흡만 학습 적용${strictRules}\n\n**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`;
+
+      // 1-A. 작가2 AI: 인물 관계 및 구도 분석
+      const writer2System = `당신은 인물 관계 및 누적 설정을 총괄하는 '작가2 AI (설정 관리자)'입니다.
+이전 에피소드들과 등장인물 설정을 분석하여, 이번 에피소드에서 강조되어야 할 인물 간 대립 구도, 관계 변화, 감정 상태를 요약하세요.
+
+**반드시 100% 한국어로 3문장 이내로 간결히 요약하세요.**`;
+      const writer2User = `${context}\n이번 에피소드에서 다룰 인물 간 대립 구도와 관계 변화를 분석하세요.`;
+      
+      let writer2Analysis = '';
+      try {
+        writer2Analysis = await callAI(writer2System, writer2User, controller.signal);
+      } catch {
+        writer2Analysis = '주인공과 주변 인물 간의 관계 심화 및 갈등 조성';
+      }
+
+      // 1-B. 작가1 AI: 개연성 및 플롯 구조 설계
+      const writer1DesignSystem = `당신은 스토리 개연성과 플롯 구성을 담당하는 '작가1 AI (스토리 닥터)'입니다.
+전체 시놉시스와 작가2 AI의 인물관계 분석을 바탕으로, 이번 에피소드의 개연성과 핵심 사건 아이디어/구조(플롯 뼈대)를 설계하세요.
+
+**반드시 100% 한국어로 개연성 및 플롯 구조 뼈대만 출력하세요.**`;
+      const writer1DesignUser = `${context}\n[작가2 AI의 인물관계 분석]\n${writer2Analysis}\n\n이번 에피소드의 개연성을 고려한 스토리 아이디어 구조 뼈대를 설계하세요.`;
+
+      let writer1Blueprint = '';
+      try {
+        writer1Blueprint = await callAI(writer1DesignSystem, writer1DesignUser, controller.signal);
+      } catch {
+        writer1Blueprint = '사건의 서막 -> 인물 간 갈등 발생 -> 예측 불가능한 반전 계기';
+      }
+
+      addLog("step1-done", "작가1 & 작가2 AI", "인물구도 및 개연성 스토리 뼈대 설계 완료!");
+
+      // ──────── STEP 2: 메인작가 AI ─ 전체 소설 본문 작문 (~3000자) ────────
+      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+      setAutoState((prev) => ({ ...prev, currentStep: "writing" }));
+      addLog("step2", "메인작가 AI", "작가1, 2의 구조를 바탕으로 3000자 본문 작문 중...");
+
+      const mainWriterSystem = `당신은 총괄 집필을 담당하는 '메인작가 AI'입니다.
+작가2 AI의 인물관계 분석과 작가1 AI의 스토리 청사진을 바탕으로, 생생하고 몰입감 넘치는 소설 본문(~3000자)을 작문하세요.
+
+[규칙]
+- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기
+- 문체 가이드는 톤과 호흡만 학습 적용${strictRules}
+
+**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`;
 
       const currentContent = targetEpisode.content || "";
       const recentContent = currentContent.length > 2000 ? currentContent.slice(-2000) : currentContent;
@@ -237,9 +280,7 @@ export function useAutoWriterEngine(
         feedbackInstruction += `위 피드백을 자연스럽게 반영하며 이어쓰세요.\n`;
       }
 
-      const mainWriterUser = `${context}\n[현재 에피소드 내용]\n...${recentContent}\n${feedbackInstruction}\n위 정보를 바탕으로 약 3000자 분량의 다음 내용을 작성해 주세요.`;
-
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+      const mainWriterUser = `${context}\n[현재 에피소드 내용]\n...${recentContent}\n[작가2 AI 인물관계 분석]\n${writer2Analysis}\n[작가1 AI 플롯 청사진]\n${writer1Blueprint}\n${feedbackInstruction}\n위 청사진과 본문을 바탕으로 약 3000자 분량의 소설 이야기를 작성해 주세요.`;
 
       const generatedDraft = await callAI(mainWriterSystem, mainWriterUser, controller.signal);
 
@@ -248,45 +289,45 @@ export function useAutoWriterEngine(
         return;
       }
 
-      addLog("step1-done", "메인작가 AI", `${generatedDraft.length}자 초안 생성 완료!`);
+      addLog("step2-done", "메인작가 AI", `${generatedDraft.length}자 초안 작문 완료!`);
 
-      // ──────── STEP 2: 검수작가 AI ─ 개연성 검토 ────────
+      // ──────── STEP 3: 작가1 AI ─ 개연성 및 OOC 검수 ────────
       if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
       setAutoState((prev) => ({ ...prev, currentStep: "reviewing" }));
-      addLog("step2", "검수작가 AI", "개연성 및 맥락 일관성 검토 중...");
+      addLog("step3", "작가1 AI", "개연성 및 인물 일관성(OOC) 검수 중...");
 
-      const reviewerSystem = `당신은 스토리 개연성과 일관성을 검토하는 '검수작가 AI'입니다.\n\n[규칙]\n- 이전 에피소드 내용 및 설정과 방금 작성된 초안의 모순(OOC, 설정 오류 등)을 찾아내세요.\n- 인물의 말투, 성격, 관계가 설정과 일치하는지 확인하세요.\n- 비판적이고 날카로운 시각으로 분석 결과를 리포트 형식으로 출력하세요.\n\n**IMPORTANT: 반드시 한국어(Korean)로만 출력하세요.**`;
+      const reviewerSystem = `당신은 스토리 개연성과 일관성을 검토하는 '작가1 AI (스토리 닥터)'입니다.\n\n[규칙]\n- 이전 에피소드 내용 및 설정과 방금 작성된 초안의 모순(OOC, 설정 오류 등)을 찾아내세요.\n- 인물의 말투, 성격, 관계가 설정과 일치하는지 검토하세요.\n- 비판적이고 날카로운 시각으로 분석 결과를 리포트 형식으로 출력하세요.\n\n**반드시 100% 한국어(Korean)로만 검수 리포트를 출력하세요.**`;
 
       const reviewerUser = `${context}\n[방금 작성된 초안]\n${generatedDraft}\n\n위 초안의 개연성, 인물 일관성, 스토리 흐름을 검토하고 구체적인 수정 방향(피드백)을 제공해 주세요.`;
 
       const reviewResult = await callAI(reviewerSystem, reviewerUser, controller.signal);
-      addLog("step2-done", "검수작가 AI", reviewResult ? `분석 완료: ${reviewResult.substring(0, 100)}...` : "분석 완료");
+      addLog("step3-done", "작가1 AI", reviewResult ? `검수 완료: ${reviewResult.substring(0, 80)}...` : "검수 완료");
 
-      // ──────── STEP 3: 메인작가 AI ─ 교정 및 보완 (Revision) ────────
+      // ──────── STEP 4: 메인작가 AI ─ 원고 교정 및 보완 (Revision) ────────
       if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
       setAutoState((prev) => ({ ...prev, currentStep: "revising" }));
-      addLog("step3", "메인작가 AI", "검수 결과를 바탕으로 초안 보완 및 수정 중...");
+      addLog("step4", "메인작가 AI", "작가1의 검수 결과를 바탕으로 원고 교정 및 보완 중...");
 
-      const revisionSystem = `당신은 검수작가의 피드백을 반영하여 원본을 고쳐쓰는 '메인작가 AI'입니다.\n\n[규칙]\n- 피드백에서 지적된 개연성 오류나 OOC(캐릭터 붕괴)를 완벽히 수정하세요.\n- 문체 가이드는 톤과 호흡만 학습하며 절대 복사하지 마세요.${strictRules}\n\n**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`;
+      const revisionSystem = `당신은 작가1 AI의 검수 피드백을 반영하여 원본을 고쳐쓰는 '메인작가 AI'입니다.\n\n[규칙]\n- 피드백에서 지적된 개연성 오류나 OOC(캐릭터 붕괴)를 완벽히 수정하세요.\n- 문체 가이드는 톤과 호흡만 학습하며 절대 복사하지 마세요.${strictRules}\n\n**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`;
       
-      const revisionUser = `[원본 초안]\n${generatedDraft}\n\n[검수작가 피드백]\n${reviewResult}\n\n위 피드백을 반영하여 원본 초안을 수정하고 보완한 최종 텍스트를 작성해 주세요.`;
+      const revisionUser = `[원본 초안]\n${generatedDraft}\n\n[작가1 AI 검수 피드백]\n${reviewResult}\n\n위 피드백을 반영하여 원본 초안을 수정하고 보완한 최종 텍스트를 작성해 주세요.`;
 
       const revisedText = await callAI(revisionSystem, revisionUser, controller.signal);
       const finalGeneratedText = revisedText || generatedDraft;
 
-      addLog("step3-done", "메인작가 AI", `보완 및 수정 완료! (${finalGeneratedText.length}자)`);
+      addLog("step4-done", "메인작가 AI", `최종 원고 교정 완료! (${finalGeneratedText.length}자)`);
 
       // 에피소드에 최종 내용 추가
       const updatedContent = currentContent ? currentContent + "\n\n" + finalGeneratedText : finalGeneratedText;
       await updateEpisode(targetEpisode.id, { content: updatedContent });
 
-      // ──────── STEP 4: 설정관리 AI ─ 인물 아크 업데이트 ────────
+      // ──────── STEP 5: 작가2 AI ─ 인물별 스토리 아크 및 관계도 갱신 ────────
       if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
       setAutoState((prev) => ({ ...prev, currentStep: "updating-arcs" }));
-      addLog("step4", "설정관리 AI", "인물 아크 및 감정 상태 업데이트 중...");
+      addLog("step5", "작가2 AI", "새 원고를 바탕으로 인물별 스토리 아크 및 관계도 갱신 중...");
 
       const arcWriterSystem = `당신은 인물별 스토리 아크를 추적하는 '설정관리 AI'입니다.\n\n[규칙]\n- 새로 확정된 텍스트에서 각 인물의 감정 변화, 관계 변화, 새로운 정보를 추출하세요.\n- 설정 노트 형태로 간결하게 정리하세요.\n\n**IMPORTANT: 반드시 한국어(Korean)로만 출력하세요.**`;
 
