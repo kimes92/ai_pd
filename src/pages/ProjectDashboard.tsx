@@ -20,7 +20,7 @@ export default function ProjectDashboard() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { getProject } = useNovelProject();
-  const { episodes, createEpisode, updateEpisode, isLoading: episodesLoading } = useNovelEpisode(id);
+  const { episodes, createEpisode, updateEpisode, deleteEpisode, isLoading: episodesLoading } = useNovelEpisode(id);
   const { settings, summaries, loadSettings, loadSummaries, saveSettings } = useStoryContext(id);
   const { getArcSummaries, isLoading: arcsLoading } = useCharacterArcs(id || "");
   useAiTaskRunner(settings, saveSettings);
@@ -221,8 +221,9 @@ export default function ProjectDashboard() {
         {activeTab === "episodes" && (
           <EpisodeList
             episodes={episodes}
-            projectId={id}
+            projectId={id || ""}
             onCreateNew={handleCreateEpisode}
+            onDeleteEpisode={deleteEpisode}
           />
         )}
 

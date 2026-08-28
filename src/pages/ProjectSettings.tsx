@@ -141,17 +141,20 @@ export default function ProjectSettings() {
 
       if (targetProjectId) {
         const filteredChars = characters.filter((c) => c.name.trim() !== "");
-        await saveSettings({
-          perspective,
-          characters: filteredChars,
-          synopsis,
-          description,
-          writing_style: writingStyle,
-          reference_text: referenceText,
-          format_rules: { dialogue: '""', thought: "''", special: "[]" },
-          scheduled_tasks: settings?.scheduled_tasks || [],
-          ai_notes: settings?.ai_notes || [],
-        });
+        await saveSettings(
+          {
+            perspective,
+            characters: filteredChars,
+            synopsis,
+            description,
+            writing_style: writingStyle,
+            reference_text: referenceText,
+            format_rules: { dialogue: '""', thought: "''", special: "[]" },
+            scheduled_tasks: settings?.scheduled_tasks || [],
+            ai_notes: settings?.ai_notes || [],
+          },
+          targetProjectId
+        );
       }
 
       toast.success(isEditMode ? "설정이 수정되었습니다" : "새 소설 프로젝트가 생성되었습니다");

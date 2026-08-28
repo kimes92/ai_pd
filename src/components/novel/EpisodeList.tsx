@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, BookOpen, Clock, FileText, ChevronRight } from "lucide-react";
+import { Plus, BookOpen, Clock, FileText, ChevronRight, Trash2 } from "lucide-react";
 
 interface Episode {
   id: string;
@@ -15,9 +15,10 @@ interface EpisodeListProps {
   episodes: Episode[];
   projectId: string;
   onCreateNew: () => void;
+  onDeleteEpisode?: (id: string) => void;
 }
 
-export function EpisodeList({ episodes, projectId, onCreateNew }: EpisodeListProps) {
+export function EpisodeList({ episodes, projectId, onCreateNew, onDeleteEpisode }: EpisodeListProps) {
   const navigate = useNavigate();
 
   const getStatusBadge = (status: Episode["status"]) => {
@@ -103,9 +104,25 @@ export function EpisodeList({ episodes, projectId, onCreateNew }: EpisodeListPro
                 </div>
               </div>
 
-              {/* 우측 상태 및 화살표 */}
-              <div className="flex items-center gap-3">
+              {/* 우측 상태 및 화살표, 삭제 버튼 */}
+              <div className="flex items-center gap-2">
                 {getStatusBadge(ep.status)}
+                {onDeleteEpisode && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`'${ep.title || `에피소드 ${ep.episode_number}`}' 회차를 정말 삭제하시겠습니까?`)) {
+                        onDeleteEpisode(ep.id);
+                      }
+                    }}
+                    className="h-8 w-8 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                    title="에피소드 삭제"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                )}
                 <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
               </div>
             </div>

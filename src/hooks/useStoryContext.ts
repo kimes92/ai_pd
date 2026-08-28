@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callAI } from '@/lib/aiHelper';
 
 export interface CharacterInfo {
   name: string;
@@ -153,12 +154,13 @@ export function useStoryContext(projectId?: string) {
     }
   }, [projectId]);
 
-  const saveSettings = useCallback(async (newSettings: Partial<NovelSettings>) => {
-    if (!projectId) return;
+  const saveSettings = useCallback(async (newSettings: Partial<NovelSettings>, overrideProjectId?: string) => {
+    const targetId = overrideProjectId || projectId;
+    if (!targetId) return;
 
     const updatedSettings: NovelSettings = {
       id: settings?.id || 'sett-' + Date.now(),
-      project_id: projectId,
+      project_id: targetId,
       perspective: newSettings.perspective || settings?.perspective || '3rd_limited',
       characters: newSettings.characters || settings?.characters || [],
       synopsis: newSettings.synopsis ?? settings?.synopsis ?? '',
@@ -176,7 +178,7 @@ export function useStoryContext(projectId?: string) {
     try {
       const payload = {
         ...updatedSettings,
-        project_id: projectId,
+        project_id: targetId,
       };
       const { data, error } = await (supabase as any)
         .from('novel_settings')
@@ -191,47 +193,50 @@ export function useStoryContext(projectId?: string) {
       console.warn('Supabase settings upsert warning, saved to LocalStorage:', err);
     }
 
-    saveLocalSettings(projectId, updatedSettings);
+    saveLocalSettings(targetId, updatedSettings);
     setSettings(updatedSettings);
   }, [projectId, settings]);
 
-  // AI 인물 자동 생성 기능 (작가2 AI)
+  // AI 인물 자동 생성 기능 (스토리 시놉시스 기반 생성)
   const generateAiCharacter = useCallback(async (instruction?: string): Promise<CharacterInfo | null> => {
     try {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/novel-assist`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          action: 'generate-character',
-          projectSettings: settings,
-          userPrompt: instruction,
-        }),
-      });
+      const synopsis = settings?.synopsis || '세계관 시놉시스 미지정';
+      const existingChars = (settings?.characters || []).map(c => c.name).join(', ');
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      const systemPrompt = `당신은 웹소설 인물 기획 전담 '설정작가 AI'입니다.
+작품의 세계관, 시놉시스, 기존 인물 관계에 완벽히 부합하는 입체적이고 매력적인 신규 등장인물 1명을 기획하세요.
 
-      const generated: CharacterInfo = await response.json();
-      if (generated && generated.name) {
-        return generated;
+**반드시 아래 JSON 형식으로만 응답하세요. 다른 설명이나 인사말은 절대 포함하지 마세요.**
+{
+  "name": "이름",
+  "appearance": "외모 묘사",
+  "personality": "성격 및 고유 특성",
+  "background": "배경 및 비하인드 스토리",
+  "relationships": "기존 인물들과의 관계 및 서사적 역할",
+  "speechStyle": "말투 및 시그니처 구어체"
+}`;
+
+      const userPrompt = `[작품 시놉시스]\n${synopsis}\n\n[기존 인물 목록]\n${existingChars || '없음'}\n\n[추가 지시사항]\n${instruction || '시놉시스에 어울리는 중요 조연 또는 대립 인물을 생성해 주세요.'}`;
+
+      const res = await callAI(systemPrompt, userPrompt);
+      const jsonMatch = res.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed && parsed.name) {
+          return {
+            name: parsed.name,
+            appearance: parsed.appearance || '',
+            personality: parsed.personality || '',
+            background: parsed.background || '',
+            relationships: parsed.relationships || '',
+            speechStyle: parsed.speechStyle || '',
+          };
+        }
       }
       return null;
     } catch (err) {
       console.error('AI 인물 생성 실패:', err);
-      // Fallback AI Character
-      return {
-        name: '엘리자베스',
-        appearance: '은발에 푸른 눈동자를 가진 신비로운 방랑 학자',
-        personality: '냉철하고 침착하지만 지식에 대한 집착이 강함',
-        background: '금서 도서관의 비밀을 추적하다가 쫓기게 됨',
-        relationships: '주인공 기사단과 비밀 정보를 거래하는 미묘한 조력자',
-        speechStyle: '정중하면서도 뼈가 있는 구어체',
-      };
+      return null;
     }
   }, [settings]);
 
