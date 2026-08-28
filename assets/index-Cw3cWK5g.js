@@ -413,17 +413,20 @@ ${e.synopsis}
 [이전 에피소드 요약]
 `,e.forEach(n=>{n.content&&(r+=`Ep.${n.episode_number} "${n.title}": ${n.content.substring(0,500)}...
 `)})),r};function GI(t,e,r,n,s){const[i,o]=v.useState({isAutoMode:!1,currentStep:"idle",currentEpisodeId:null,pipelineLog:[],isProcessing:!1}),a=v.useRef(null),l=v.useRef(!1),c=v.useCallback((b,y,g)=>{const x={id:`log_${Date.now()}`,step:b,agentName:y,summary:g,timestamp:new Date().toISOString()};if(o(_=>({..._,pipelineLog:[..._.pipelineLog.slice(-50),x]})),t){const _=[...(t.auto_writer_log||[]).slice(-50),x];e({auto_writer_log:_})}},[t,e]),d=v.useCallback(async()=>{if(!t||l.current)return;l.current=!0;const b=new AbortController;a.current=b;try{let y=r[r.length-1];(!y||y.status==="finalized")&&(o(U=>({...U,currentStep:"writing",isProcessing:!0})),c("create","시스템",`새로운 에피소드 ${r.length+1} 생성 중...`),y=await s(`에피소드 ${r.length+1}`)),o(U=>({...U,currentEpisodeId:y.id,currentStep:"writing",isProcessing:!0}));const g=Ny(t,r);c("step1","메인작가 AI","문맥을 분석하고 초안을 작성 중입니다...");const x=`
-[웹소설 전용 제약 조건]
-- 이전 문장에서 썼던 비유나 묘사 단어의 재사용을 엄격히 금지합니다.
-- 상투적인 표현(예: '가슴이 웅장해진다', '묘한 미소를 지었다' 등)을 배제하고 구체적인 행동과 대사 위주로 서술하세요.
-- 주인공의 내면 독백이 3문단 이상 길어지지 않도록 즉시 사건이나 갈등 상황으로 전환하세요.`,_=`당신은 총괄 집필을 담당하는 '메인작가 AI'입니다.
+[웹소설 전용 최고 지침]
+1. 오직 순수한 소설 본문 문장만 출력하세요. (인사말, 챕터/에피소드 제목, 캐릭터 설명, 서론/결론 요약, 영문 설명문 등 어떠한 메타 텍스트나 부연 설명도 절대로 포함하지 마세요.)
+2. 내부적으로 영어로 사고하거나 계산하더라도, 최종 출력물은 100% 자연스러운 한국어 소설 본문 문장이어야 합니다.
+3. 10번 이상 깊게 생각하여 전개의 파생 변수와 개연성을 시뮬레이션한 뒤, 가장 입체적이고 흥미진진한 본문만 작성하세요.
+4. 이전 문장에서 사용했던 동일한 비유, 묘사, 단어, 상황의 무한 반복을 완벽히 차단하세요.
+5. 상투적인 표현을 배제하고 구체적인 인물의 행동, 감정선, 대사 위주로 전개하세요.
+6. 주인공의 내면 독백이 3문단 이상 길어지지 않도록 즉시 외부 사건이나 갈등 상황으로 전환하세요.`,_=`당신은 총괄 집필을 담당하는 '메인작가 AI'입니다.
 
 [규칙]
 - 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기
 - 주요 인물 외에도 상황에 맞는 엑스트라·조연을 자유롭게 삽입
 - 문체 가이드는 절대 복사하지 말고 톤과 호흡만 학습 적용${x}
 
-**IMPORTANT: 반드시 한국어(Korean)로만 출력하세요.**`,k=y.content||"",S=k.length>2e3?k.slice(-2e3):k,E=(t.user_feedbacks||[]).filter(U=>U.status==="pending"&&U.episodeId===y.id);let T="";E.length>0&&(T=`
+**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`,k=y.content||"",S=k.length>2e3?k.slice(-2e3):k,E=(t.user_feedbacks||[]).filter(U=>U.status==="pending"&&U.episodeId===y.id);let T="";E.length>0&&(T=`
 [사용자 피드백 반영 요청]
 `,E.forEach(U=>{T+=`- ${U.instruction}
 `}),T+=`위 피드백을 자연스럽게 반영하며 이어쓰세요.
@@ -448,7 +451,7 @@ ${C}
 - 피드백에서 지적된 개연성 오류나 OOC(캐릭터 붕괴)를 완벽히 수정하세요.
 - 문체 가이드는 톤과 호흡만 학습하며 절대 복사하지 마세요.${x}
 
-**IMPORTANT: 반드시 한국어(Korean)로만 출력하세요.**`,se=`[원본 초안]
+**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`,se=`[원본 초안]
 ${C}
 
 [검수작가 피드백]
@@ -537,17 +540,20 @@ ${e.characterContext}
 [이전 회차 줄거리 요약]
 `,i.forEach(N=>{const A=Array.isArray(N.events)?N.events.join(", "):"";c+=`Ep.${N.episode_number}: 주요사건(${A})
 `}));const d=`
-[웹소설 전용 제약 조건]
-- 이전 문장에서 썼던 비유나 묘사 단어의 재사용을 엄격히 금지합니다.
-- 상투적인 표현(예: '가슴이 웅장해진다', '묘한 미소를 지었다' 등)을 배제하고 구체적인 행동과 대사 위주로 서술하세요.
-- 주인공의 내면 독백이 3문단 이상 길어지지 않도록 즉시 사건이나 갈등 상황으로 전환하세요.`;let h="",p="";if(t==="continue"){h=`당신은 총괄 집필을 담당하는 '메인작가 AI'입니다.
+[웹소설 전용 최고 지침]
+1. 오직 순수한 소설 본문 문장만 출력하세요. (인사말, 챕터/에피소드 제목, 캐릭터 설명, 서론/결론 요약, 영문 설명문 등 어떠한 메타 텍스트나 부연 설명도 절대로 포함하지 마세요.)
+2. 내부적으로 영어로 사고하거나 계산하더라도, 최종 출력물은 100% 자연스러운 한국어 소설 본문 문장이어야 합니다.
+3. 10번 이상 깊게 생각하여 전개의 파생 변수와 개연성을 시뮬레이션한 뒤, 가장 입체적이고 흥미진진한 본문만 작성하세요.
+4. 이전 문장에서 사용했던 동일한 비유, 묘사, 단어, 상황의 무한 반복을 완벽히 차단하세요.
+5. 상투적인 표현을 배제하고 구체적인 인물의 행동, 감정선, 대사 위주로 전개하세요.
+6. 주인공의 내면 독백이 3문단 이상 길어지지 않도록 즉시 외부 사건이나 갈등 상황으로 전환하세요.`;let h="",p="";if(t==="continue"){h=`당신은 총괄 집필을 담당하는 '메인작가 AI'입니다.
 
 [규칙]
 - 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기
 - 주요 인물 외에도 상황에 맞는 엑스트라·조연을 자유롭게 삽입
 - 문체 가이드는 절대 복사하지 말고 톤과 호흡만 학습 적용${d}
 
-**IMPORTANT: You MUST write your ENTIRE response in Korean. 반드시 한국어로만 출력하세요.**`;const N=o.length>2e3?o.slice(-2e3):o;p=`${c}
+**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`;const N=o.length>2e3?o.slice(-2e3):o;p=`${c}
 [현재 에피소드 내용]
 ...${N}
 `,a&&(p+=`[유저 지시]
@@ -556,20 +562,20 @@ ${a}
 
 [규칙] 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기${d}
 
-**IMPORTANT: You MUST write your ENTIRE response in Korean. 반드시 한국어로만 출력하세요.**`,p=`${c}
+**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`,p=`${c}
 [대화 상황]
 ${a||"현재 상황에 맞는 대화를 생성"}
 
 [현재 텍스트]
 ...${o.slice(-1e3)}`;else if(t==="suggest")h=`당신은 작가1 AI 입니다. 현재 내용과 전체 시놉시스에 맞는 다음 장면 아이디어 3가지를 제안하세요.
 
-**IMPORTANT: You MUST write your ENTIRE response in Korean. 반드시 한국어로만 출력하세요.**`,p=`${c}
+**반드시 한국어(Korean)로만 출력하세요.**`,p=`${c}
 [현재 내용]
 ...${o.slice(-1500)}
 
 다음 장면 아이디어 3개를 구체적으로 제시해 주세요.`;else if(t==="rewrite")h=`당신은 재작성 전담 AI 입니다. 선택된 텍스트를 시놉시스와 인물 말투에 맞게 더 풍부하고 감각적인 문장으로 바꾸세요.${d}
 
-**IMPORTANT: You MUST write your ENTIRE response in Korean. 반드시 한국어로만 출력하세요.**`,p=`${c}
+**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`,p=`${c}
 [원본 텍스트]
 ${l}
 
@@ -583,7 +589,7 @@ ${a}
 - 기존 내용에서 피드백과 관련된 부분만 수정/강화하고 나머지는 보존하세요.
 - 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기${d}
 
-**IMPORTANT: You MUST write your ENTIRE response in Korean. 반드시 한국어로만 출력하세요.**`,p=`${c}
+**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`,p=`${c}
 [현재 에피소드 전체 내용]
 ${o}
 
