@@ -176,19 +176,6 @@ export function useChunkGeneration() {
           error: err.message || 'AI 생성에 실패했습니다.',
         }));
         return null;
-      }
-      } catch (err: any) {
-        if (err.name === 'AbortError') {
-          console.log('생성이 취소되었습니다');
-          return null;
-        }
-        console.error('AI 생성 중 오류 발생:', err);
-        setState(prev => ({
-          ...prev,
-          error: 'AI 생성 중 오류가 발생했습니다. 다시 시도해주세요.',
-          isGenerating: false,
-        }));
-        return null;
       } finally {
         abortRef.current = null;
       }
