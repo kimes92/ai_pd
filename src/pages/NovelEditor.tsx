@@ -239,30 +239,33 @@ export default function NovelEditor() {
 
 
   // Writer 1 AI Consistency Check (작가1 AI 개연성 검토)
-  const handleCorrectTextFallback = async () => {};
+  const [isApplyingFeedback, setIsApplyingFeedback] = useState(false);
+
   const handleCheckConsistency = async () => {
     if (!content.trim()) return toast.error("검토할 본문 텍스트가 없습니다");
     setIsCheckingConsistency(true);
     try {
-      const systemPrompt = `당신은 스토리 개연성과 문맥 일관성을 분석하는 '작가1 AI (스토리 닥터)'입니다.
-전체 소설 시놉시스, 주요 등장인물 말투/성격, 이전 에피소드 흐름과 방금 작성된 본문을 정밀히 비교 분석하세요.
+      const systemPrompt = `당신은 웹소설 스토리 개연성과 문맥 일관성을 정밀 분석하는 '작가1 AI (스토리 닥터)'입니다.
 
-[분석 포인트]
-1. 설정 모순 및 개연성 오류 (OOC, 인물 성격/말투 붕괴)
-2. 복선 및 복선 미수습 항목
-3. 문장 전개의 가독성 및 개선 방향
+[엄격 규칙]
+- 절대로 영어나 영문 타이틀(Story Doctor Report, Conflict, Plot Holes 등)을 단 한 단어도 포함하지 마세요.
+- 오직 100% 한국어(Korean)로만 아래 지정된 양식에 맞추어 비판적으로 분석 리포트를 작성하세요.
 
-**반드시 100% 한국어(Korean) 리포트 형식으로 구체적이고 비판적으로 작성하세요. 영어나 설명문, 메타 텍스트는 절대 금지합니다.**`;
+[분석 양식]
+1. 개연성 및 설정 일관성: (상세 분석)
+2. 인물 성격 및 감정선: (상세 분석)
+3. 스토리 개선 피드백: (구체적 수정 방향)`;
 
       const synopsisText = settings?.synopsis || '세계관 시놉시스 미지정';
-      const userPrompt = `[작품 시놉시스]\n${synopsisText}\n\n[검토할 본문 텍스트]\n${content}\n\n위 본문의 개연성, 인물 일관성, 문맥 흐름을 검토하고 구체적인 수정 방향 리포트를 한국어로 작성해 주세요.`;
+      const userPrompt = `[작품 시놉시스]\n${synopsisText}\n\n[검토할 본문 텍스트]\n${content}\n\n위 본문의 개연성, 인물 일관성, 문맥 흐름을 검토하고 구체적인 수정 방향 리포트를 100% 한국어로 작성해 주세요.`;
 
       const report = await callAI(systemPrompt, userPrompt);
       if (report) {
         setConsistencyResult({
-          score: 88,
-          issues: [{ type: "consistency", description: report }],
-          suggestions: ["작가1 AI의 개연성 분석 리포트를 확인하고 수정하세요."],
+          score: 85,
+          issues: [{ type: "개연성 분석 리포트", description: report }],
+          writerAdvice: "위 작가1 AI의 피드백을 확인하신 후, [✨ 피드백 본문에 즉시 반영하기] 버튼을 누르면 메인작가가 본문을 자동으로 수정해 드립니다.",
+          rawReport: report,
         });
         setShowConsistencyDialog(true);
       }
@@ -271,6 +274,34 @@ export default function NovelEditor() {
       toast.error("개연성 검토에 실패했습니다.");
     } finally {
       setIsCheckingConsistency(false);
+    }
+  };
+
+  // 작가1 AI 피드백을 메인작가가 본문에 즉시 반영하여 수정
+  const handleApplyFeedback = async () => {
+    if (!consistencyResult?.rawReport || !content) return;
+    setIsApplyingFeedback(true);
+    try {
+      const systemPrompt = `당신은 작가1 AI의 개연성 피드백을 반영하여 소설 본문을 직접 수정하는 '메인작가 AI'입니다.
+
+[규칙]
+- 작가1 AI가 지적한 개연성 문제와 스토리 모순을 해결하면서 소설 본문을 다듬으세요.
+- 대화는 "", 속마음은 '', 특별 메세지는 [] 서식을 철저히 준수하세요.
+- 인사말이나 설명문, 영문 메타 텍스트를 절대로 출력하지 말고 100% 수정 완료된 한국어 소설 본문 전체만 출력하세요.`;
+
+      const userPrompt = `[기존 소설 본문]\n${content}\n\n[작가1 AI 개연성 피드백]\n${consistencyResult.rawReport}\n\n위 피드백을 완벽히 반영하여 수정 완료된 소설 본문 전체를 100% 한국어로 작성해 주세요.`;
+
+      const revised = await callAI(systemPrompt, userPrompt);
+      if (revised) {
+        setContent(revised);
+        setShowConsistencyDialog(false);
+        toast.success("✨ 작가1 AI의 피드백을 반영하여 본문 수정을 완료했습니다!");
+      }
+    } catch (err) {
+      console.error("피드백 반영 오류:", err);
+      toast.error("피드백 반영 중 오류가 발생했습니다.");
+    } finally {
+      setIsApplyingFeedback(false);
     }
   };
 
@@ -607,6 +638,22 @@ export default function NovelEditor() {
                   <p>{consistencyResult.writerAdvice}</p>
                 </div>
               )}
+
+              {/* 피드백 본문 반영 버튼 */}
+              <div className="pt-2">
+                <Button
+                  onClick={handleApplyFeedback}
+                  disabled={isApplyingFeedback}
+                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs gap-2 py-3 shadow-lg shadow-purple-950/40"
+                >
+                  {isApplyingFeedback ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                  )}
+                  <span>✨ 이 피드백을 본문에 즉시 반영하여 수정하기</span>
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>

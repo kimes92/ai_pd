@@ -91,7 +91,11 @@ const fetchAI = async (
 
 **절대로 영어나 설명문, 메타 텍스트를 출력하지 말고 100% 한국어 순수 소설 본문만 출력하세요.**`;
 
-    const mainWriterUser = `${context}\n${textSnippet}\n[작가1 AI의 개연성 & 스토리 아이디어 뼈대]\n${writer1Plan}\n${direction ? `[유저 지시사항]\n${direction}\n` : ''}위 작가1의 청사진을 바탕으로 소설 본문을 풍부하게 작성해 주세요.`;
+    const directionDirective = direction
+      ? `\n[유저 지시 장면/지시사항 반영 (필수)]\n${direction}\n위 지시사항 및 장면 구상을 바탕으로 인물 간 대화(""), 속마음(''), 사건 묘사를 더해 완벽한 웹소설 문장 형태로 3000자 분량을 펼쳐 작성해 주세요.`
+      : '';
+
+    const mainWriterUser = `${context}\n${textSnippet}\n[작가1 AI의 개연성 & 스토리 아이디어 뼈대]\n${writer1Plan}\n${directionDirective}\n위 청사진을 바탕으로 소설 본문을 풍부하게 작문해 주세요.`;
 
     return await callAI(mainWriterSystem, mainWriterUser, signal);
   }
