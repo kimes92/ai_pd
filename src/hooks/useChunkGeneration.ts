@@ -60,25 +60,28 @@ const fetchAI = async (
 5. 상투적인 표현을 배제하고 구체적인 인물의 행동, 감정선, 대사 위주로 전개하세요.
 6. 주인공의 내면 독백이 3문단 이상 길어지지 않도록 즉시 외부 사건이나 갈등 상황으로 전환하세요.`;
 
+  const textSnippet = currentText.trim()
+    ? `[현재 에피소드 내용]\n...${currentText.slice(-2000)}`
+    : `[현재 에피소드 내용]\n(아직 작성된 본문 텍스트가 없습니다. 이번 에피소드의 시작입니다.)`;
+
   let systemPrompt = '';
   let userPrompt = '';
   if (action === 'continue') {
-    systemPrompt = `당신은 총괄 집필을 담당하는 '메인작가 AI'입니다.\n\n[규칙]\n- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기\n- 주요 인물 외에도 상황에 맞는 엑스트라·조연을 자유롭게 삽입\n- 문체 가이드는 절대 복사하지 말고 톤과 호흡만 학습 적용${strictRules}\n\n**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`;
-    const recent = currentText.length > 2000 ? currentText.slice(-2000) : currentText;
-    userPrompt = `${context}\n[현재 에피소드 내용]\n...${recent}\n`;
-    if (direction) userPrompt += `[유저 지시]\n${direction}\n`;
-    userPrompt += `위 정보를 바탕으로 약 3000자 분량의 다음 내용을 작성해 주세요.`;
+    systemPrompt = `당신은 총괄 집필을 담당하는 '메인작가 AI'입니다.\n\n[규칙]\n- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기\n- 주요 인물 외에도 상황에 맞는 엑스트라·조연을 자유롭게 삽입\n- 문체 가이드는 절대 복사하지 말고 톤과 호흡만 학습 적용${strictRules}\n\n**절대로 영어나 설명문을 출력하지 말고 100% 한국어 순수 소설 본문만 출력하세요.**`;
+    userPrompt = `${context}\n${textSnippet}\n`;
+    if (direction) userPrompt += `[유저 지시사항]\n${direction}\n`;
+    userPrompt += `위 정보와 시놉시스를 바탕으로 약 3000자 분량의 소설 이야기를 작성해 주세요.`;
   } else if (action === 'dialogue') {
-    systemPrompt = `당신은 대화 전담 AI 입니다. 인물들의 고유 말투와 성격을 반영해 자연스러운 대화를 작성하세요.\n\n[규칙] 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기${strictRules}\n\n**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`;
-    userPrompt = `${context}\n[대화 상황]\n${direction || '현재 상황에 맞는 대화를 생성'}\n\n[현재 텍스트]\n...${currentText.slice(-1000)}`;
+    systemPrompt = `당신은 인물 대화 전담 AI 입니다. 등장인물들의 고유 말투와 성격을 생생하게 반영해 입체적인 대화 장면을 작성하세요.\n\n[규칙] 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기${strictRules}\n\n**절대로 영어나 설명문을 출력하지 말고 100% 한국어 순수 소설 대화 장면만 출력하세요.**`;
+    userPrompt = `${context}\n${textSnippet}\n\n[대화 상황/지시]\n${direction || '현재 등장인물들의 성격과 관계에 어울리는 대화 씬을 생성해 주세요.'}`;
   } else if (action === 'suggest') {
-    systemPrompt = `당신은 작가1 AI 입니다. 현재 내용과 전체 시놉시스에 맞는 다음 장면 아이디어 3가지를 제안하세요.\n\n**반드시 한국어(Korean)로만 출력하세요.**`;
-    userPrompt = `${context}\n[현재 내용]\n...${currentText.slice(-1500)}\n\n다음 장면 아이디어 3개를 구체적으로 제시해 주세요.`;
+    systemPrompt = `당신은 스토리 구성을 돕는 '작가1 AI (아이디어 닥터)'입니다.\n\n[규칙]\n- 절대로 영어나 영문 타이틀(Here are three scene ideas..., Scene Idea 1 등)을 출력하지 마세요.\n- 100% 자연스러운 한국어(Korean)로만 다음 장면 아이디어 3가지를 1), 2), 3) 번호로 구체적이고 흥미진진하게 제안하세요.`;
+    userPrompt = `${context}\n${textSnippet}\n\n[지시사항]\n${direction || '스토리를 극적으로 이끌어갈 다음 장면 아이디어 3개를 제안해 주세요.'}`;
   } else if (action === 'rewrite') {
-    systemPrompt = `당신은 재작성 전담 AI 입니다. 선택된 텍스트를 시놉시스와 인물 말투에 맞게 더 풍부하고 감각적인 문장으로 바꾸세요.${strictRules}\n\n**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`;
+    systemPrompt = `당신은 재작성 전담 AI 입니다. 선택된 텍스트를 시놉시스와 인물 말투에 맞게 더 풍부하고 감각적인 문장으로 바꾸세요.${strictRules}\n\n**절대로 영어나 설명문을 출력하지 말고 100% 한국어 순수 소설 본문만 출력하세요.**`;
     userPrompt = `${context}\n[원본 텍스트]\n${selectedText}\n\n[지시사항]\n${direction}\n\n위 텍스트를 재작성해 주세요.`;
   } else if (action === 'feedback-rewrite') {
-    systemPrompt = `당신은 사용자의 피드백을 반영하여 기존 소설 본문을 수정하는 '편집 작가 AI'입니다.\n\n[규칙]\n- 사용자의 피드백 지시를 정확히 반영하되, 전체 스토리 흐름은 최대한 유지하세요.\n- 기존 내용에서 피드백과 관련된 부분만 수정/강화하고 나머지는 보존하세요.\n- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기${strictRules}\n\n**반드시 한국어(Korean) 순수 소설 본문만 출력하세요.**`;
+    systemPrompt = `당신은 사용자의 피드백을 반영하여 기존 소설 본문을 수정하는 '편집 작가 AI'입니다.\n\n[규칙]\n- 사용자의 피드백 지시를 정확히 반영하되, 전체 스토리 흐름은 최대한 유지하세요.\n- 기존 내용에서 피드백과 관련된 부분만 수정/강화하고 나머지는 보존하세요.\n- 대화는 "", 생각은 '', 특별 메세지는 [] 로 표기${strictRules}\n\n**절대로 영어나 설명문을 출력하지 말고 100% 한국어 순수 소설 본문만 출력하세요.**`;
     userPrompt = `${context}\n[현재 에피소드 전체 내용]\n${currentText}\n\n[사용자 피드백 지시사항]\n${direction}\n\n위 에피소드 내용에서 사용자 피드백을 반영하여 수정된 전체 에피소드 내용을 출력해 주세요. 피드백과 무관한 부분은 최대한 원문을 유지하세요.`;
   } else {
     throw new Error(`Unsupported action: ${action}`);
