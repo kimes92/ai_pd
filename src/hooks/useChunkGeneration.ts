@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { callAI } from '@/lib/aiHelper';
+import { DEFAULT_WEB_NOVEL_PROMPT } from '@/hooks/useStoryContext';
 
 export interface ChunkState {
   isGenerating: boolean;
@@ -52,14 +53,18 @@ const fetchAI = async (
     });
   }
 
+  const customPrompt = projectSettings?.custom_writing_prompt || DEFAULT_WEB_NOVEL_PROMPT;
+
   const strictRules = `
-[웹소설 전용 최고 지침]
-1. 오직 순수한 소설 본문 문장만 출력하세요. (인사말, 챕터/에피소드 제목, 캐릭터 설명, 서론/결론 요약, 영문 설명문 등 어떠한 메타 텍스트나 부연 설명도 절대로 포함하지 마세요.)
-2. 내부적으로 영어로 사고하거나 계산하더라도, 최종 출력물은 100% 자연스러운 한국어 소설 본문 문장이어야 합니다.
-3. 10번 이상 깊게 생각하여 전개의 파생 변수와 개연성을 시뮬레이션한 뒤, 가장 입체적이고 흥미진진한 본문만 작성하세요.
-4. 이전 문장에서 사용했던 동일한 비유, 묘사, 단어, 상황의 무한 반복을 완벽히 차단하세요.
-5. 상투적인 표현을 배제하고 구체적인 인물의 행동, 감정선, 대사 위주로 전개하세요.
-6. 주인공의 내면 독백이 3문단 이상 길어지지 않도록 즉시 외부 사건이나 갈등 상황으로 전환하세요.`;
+[웹소설 전용 필수 집필 지침]
+${customPrompt}
+
+[엄격 규칙]
+1. ⚠️ 개요/요약 금지: '1장 **주인공의 000', '주인공은 좀비를 만나서 ~' 같은 스토리보드, 개요 요약, 줄거리 문장을 절대로 출력하지 마세요.
+2. 대화체(""): 인물 간 대사는 반드시 큰따옴표("")를 사용해 입체적인 대화 장면으로 묘사하세요.
+3. 속마음(''): 인물의 내면 고민과 독백은 작은따옴표('')로 짧고 강렬하게 표기하세요.
+4. 오직 실제 연재되는 한국어 순수 웹소설 본문 문장만 출력하세요. (인사말, 챕터 제목, 캐릭터 설명 등 메타 텍스트 절대로 금지)
+5. 1~2문장마다 줄바꿈하여 모바일 웹소설 특유의 빠른 호흡과 높은 가독성을 유지하세요.`;
 
   const textSnippet = currentText.trim()
     ? `[현재 에피소드 내용]\n...${currentText.slice(-2000)}`

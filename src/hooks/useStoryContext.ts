@@ -56,10 +56,20 @@ export interface NovelSettings {
   reference_text: string;
   scheduled_tasks?: AiScheduledTask[];
   ai_notes?: AiNote[];
+  custom_writing_prompt?: string;
   auto_writer_enabled?: boolean;
   auto_writer_log?: PipelineLog[];
   user_feedbacks?: UserFeedback[];
 }
+
+export const DEFAULT_WEB_NOVEL_PROMPT = `[웹소설 전용 실감나는 집필 지침 - 필수 적용]
+1. ⚠️ 개요/요약 금지: '1장 **주인공의 000', '주인공은 좀비를 만나서 ~' 같은 스토리보드/줄거리 요약 문장을 절대로 출력하지 마세요.
+2. 대화체(""): 인물 간 대사는 큰따옴표("")로 별도 문단을 나눠 생생하고 입체적으로 작성하세요.
+   예: "젠장! 내가 여기서 능력을 써버리면 승리할 수 있을까?"
+3. 속마음(''): 인물의 긴박한 내면 독백과 심리 고민은 작은따옴표('')로 짧고 강렬하게 표현하세요.
+   예: '이 방법밖에 없다. 더 늦으면 모두 끝이야.'
+4. 상황 묘사: 인물의 시선, 떨리는 호흡, 시각/청각적 현장감을 감각적인 문장으로 표현하세요.
+5. 가독성: 1~2문장마다 줄바꿈하여 모바일 웹소설 특유의 빠른 호흡과 몰입감을 유지하세요.`;
 
 export interface StorySummary {
   id: string;
@@ -116,6 +126,7 @@ export function useStoryContext(projectId?: string) {
           format_rules: data.format_rules || defaultFormatRules,
           scheduled_tasks: data.scheduled_tasks || [],
           ai_notes: data.ai_notes || [],
+          custom_writing_prompt: data.custom_writing_prompt || DEFAULT_WEB_NOVEL_PROMPT,
           auto_writer_enabled: data.auto_writer_enabled || false,
           auto_writer_log: data.auto_writer_log || [],
           user_feedbacks: data.user_feedbacks || [],

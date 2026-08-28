@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useNovelProject } from "@/hooks/useNovelProject";
-import { useStoryContext, type CharacterInfo } from "@/hooks/useStoryContext";
+import { useStoryContext, type CharacterInfo, DEFAULT_WEB_NOVEL_PROMPT } from "@/hooks/useStoryContext";
 import { CharacterCard } from "@/components/novel/CharacterCard";
 import { CharacterRelationshipMap } from "@/components/novel/CharacterRelationshipMap";
 import { AiSchedulePanel } from "@/components/novel/AiSchedulePanel";
@@ -42,6 +42,7 @@ export default function ProjectSettings() {
   const [description, setDescription] = useState("");
   const [writingStyle, setWritingStyle] = useState("");
   const [referenceText, setReferenceText] = useState("");
+  const [customWritingPrompt, setCustomWritingPrompt] = useState(DEFAULT_WEB_NOVEL_PROMPT);
   const [characters, setCharacters] = useState<CharacterInfo[]>([
     { name: "", appearance: "", personality: "", background: "", relationships: "", speechStyle: "" },
   ]);
@@ -67,6 +68,7 @@ export default function ProjectSettings() {
           setDescription(s.description || "");
           setWritingStyle(s.writing_style || "");
           setReferenceText(s.reference_text || "");
+          setCustomWritingPrompt(s.custom_writing_prompt || DEFAULT_WEB_NOVEL_PROMPT);
           if (s.characters && s.characters.length > 0) {
             setCharacters(s.characters);
           }
@@ -149,6 +151,7 @@ export default function ProjectSettings() {
             description,
             writing_style: writingStyle,
             reference_text: referenceText,
+            custom_writing_prompt: customWritingPrompt,
             format_rules: { dialogue: '""', thought: "''", special: "[]" },
             scheduled_tasks: settings?.scheduled_tasks || [],
             ai_notes: settings?.ai_notes || [],
@@ -317,15 +320,30 @@ export default function ProjectSettings() {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                문체 참고 샘플 텍스트 (선택)
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-purple-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                  ✨ 맞춤 AI 집필 프롬프트 (웹소설 연재용 필수 가이드)
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCustomWritingPrompt(DEFAULT_WEB_NOVEL_PROMPT)}
+                  className="text-[11px] h-7 border-purple-500/30 text-purple-300 hover:bg-purple-900/40"
+                >
+                  웹소설 표준 프롬프트 자동적용
+                </Button>
+              </div>
               <Textarea
-                value={referenceText}
-                onChange={(e) => setReferenceText(e.target.value)}
-                placeholder="AI가 참고하길 바라는 본인의 문체나 선호하는 소설 단락을 붙여넣으세요."
-                className="bg-background/50 text-xs h-24 font-serif-kr"
+                value={customWritingPrompt}
+                onChange={(e) => setCustomWritingPrompt(e.target.value)}
+                placeholder="AI가 글을 쓸 때 고정으로 참고할 집필 가이드 및 규칙을 입력하세요."
+                className="bg-background/60 text-xs h-36 leading-relaxed font-mono border-purple-500/30 focus:border-purple-500"
               />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                ※ 이 프롬프트는 AI 이어쓰기, 대화 생성, 자동화 모드 전체에 고정 적용되어 개요/스토리보드가 아닌 연재 웹소설 형태로 작문하도록 강제합니다.
+              </p>
             </div>
           </section>
 
