@@ -6,6 +6,7 @@ import { useCharacterArcs } from "@/hooks/useCharacterArcs";
 import { useChunkGeneration } from "@/hooks/useChunkGeneration";
 import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import { useAiTaskRunner } from "@/hooks/useAiTaskRunner";
+import { callAI } from "@/lib/aiHelper";
 
 import { AiControlPanel, AiOutputPanel } from "@/components/novel/AiAssistPanel";
 import { AiTextBlock } from "@/components/novel/AiTextBlock";
@@ -202,27 +203,51 @@ export default function NovelEditor() {
     }
   };
 
-  // Grammar & Novel Format Correction
+  // Grammar & Novel Format Correction (Custom AI / Supabase Fallback)
   const handleCorrectText = async () => {
     if (!content.trim()) return toast.error("교정할 본문 텍스트가 없습니다");
     setIsCorrecting(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/correct-text`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ text: content, correctionType: "novel" }),
-      });
+      // 1. Try Supabase function if available
+      if (import.meta.env.VITE_SUPABASE_URL) {
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/correct-text`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text: content, correctionType: "novel" }),
+        });
 
-      if (!response.ok) throw new Error("교정 실패");
-      const { correctedText } = await response.json();
-      if (correctedText) {
-        setContent(correctedText);
-        toast.success("소설 서식 및 맞춤법 교정 완료!");
+        if (response.ok) {
+          const { correctedText } = await response.json();
+          if (correctedText) {
+            setContent(correctedText);
+            toast.success("소설 서식 및 맞춤법 교정 완료!");
+            return;
+          }
+        }
       }
-    } catch (err) {
+    } catch {
+      // Fallback
+    }
+
+    // 2. Fallback: Use active AI Provider (Local AI / Gemini / OpenAI)
+    try {
+      const systemPrompt = `당신은 웹소설 전문 맞춤법, 띄어쓰기 및 서식 교정 에디터 AI입니다.
+주어진 본문의 오탈자를 교정하고, 웹소설 표준 문체 및 문장 호흡에 맞춰 다듬으세요.
+
+[규칙]
+- 대화체는 "", 속마음은 '', 시스템 메세지는 [] 서식을 철저히 적용하세요.
+- 전체 스토리 줄거리, 등장인물의 고유 말투나 대사는 절대로 변경하지 마세요.
+- 오직 교정된 본문 텍스트 전체만 출력하세요. (인사말, 교정 내역 설명 등 메타 텍스트 금지)`;
+
+      const corrected = await callAI(systemPrompt, content);
+      if (corrected) {
+        setContent(corrected);
+        toast.success("소설 서식 및 맞춤법 교정 완료! (AI 에디터 적용)");
+      }
+    } catch (err: any) {
       console.error("교정 오류:", err);
       toast.error("맞춤법 교정에 실패했습니다");
     } finally {
@@ -407,6 +432,7 @@ export default function NovelEditor() {
                 onInsertDialogue={() => insertFormat('"', '"')}
                 onInsertThought={() => insertFormat("'", "'")}
                 onInsertSpecial={() => insertFormat("[", "]")}
+                onInsertParen={() => insertFormat("(", ")")}
                 onCorrectText={handleCorrectText}
                 onCheckConsistency={handleCheckConsistency}
                 onToggleTTS={() => setShowTTS(!showTTS)}

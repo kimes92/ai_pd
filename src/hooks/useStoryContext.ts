@@ -197,26 +197,69 @@ export function useStoryContext(projectId?: string) {
     setSettings(updatedSettings);
   }, [projectId, settings]);
 
-  // AI 인물 자동 생성 기능 (스토리 시놉시스 기반 생성)
+  // AI 인물 자동 생성 기능 (주인공, 시놉시스, 에피소드 유기적 분석 기반 생성)
   const generateAiCharacter = useCallback(async (instruction?: string): Promise<CharacterInfo | null> => {
     try {
       const synopsis = settings?.synopsis || '세계관 시놉시스 미지정';
-      const existingChars = (settings?.characters || []).map(c => c.name).join(', ');
+      const description = settings?.description || '';
+      const perspective = settings?.perspective || '3rd_limited';
 
-      const systemPrompt = `당신은 웹소설 인물 기획 전담 '설정작가 AI'입니다.
-작품의 세계관, 시놉시스, 기존 인물 관계에 완벽히 부합하는 입체적이고 매력적인 신규 등장인물 1명을 기획하세요.
+      // 1. 등록된 주요 등장인물(특히 주인공)의 세부 설정 분석
+      let registeredCharsText = '';
+      if (settings?.characters && settings.characters.length > 0) {
+        registeredCharsText = settings.characters
+          .filter(c => c.name.trim() !== '')
+          .map((c, idx) => `[인물 ${idx + 1}: ${c.name}]
+- 외모: ${c.appearance || '미지정'}
+- 성격/특징: ${c.personality || '미지정'}
+- 배경/과거: ${c.background || '미지정'}
+- 말투: ${c.speechStyle || '미지정'}
+- 인물관계: ${c.relationships || '미지정'}`)
+          .join('\n\n');
+      } else {
+        registeredCharsText = '등록된 기존 인물 정보 없음';
+      }
 
-**반드시 아래 JSON 형식으로만 응답하세요. 다른 설명이나 인사말은 절대 포함하지 마세요.**
+      // 2. 진행된 에피소드 흐름 분석
+      let episodeFlowText = '';
+      if (summaries && summaries.length > 0) {
+        episodeFlowText = summaries
+          .map(s => `Ep.${s.episode_number}: 주요사건(${Array.isArray(s.events) ? s.events.join(', ') : ''})`)
+          .join('\n');
+      } else {
+        episodeFlowText = '진행된 에피소드 없음';
+      }
+
+      const systemPrompt = `당신은 웹소설 인물 기획 및 세계관 구성 전담 '설정작가 AI'입니다.
+작품의 시놉시스, 등록된 주인공(예: 강찬성 등)의 성격/외모/과거 배경/말투, 그리고 현재까지의 에피소드 서사 흐름을 유기적으로 깊이 있게 분석하세요.
+
+[기획 원칙]
+- 정형화되거나 상투적인 캐릭터 템플릿 생성을 절대 금지합니다.
+- 주인공의 가치관이나 목적과 강렬하게 대립하거나, 심도 있게 결탁하여 서사의 위기와 갈등을 증폭시키는 입체적인 인물 1명을 기획하세요.
+- 인물의 이름, 외모, 성격, 과거사, 주인공과의 관계, 시그니처 말투를 매우 세밀하고 구체적으로 작성하세요.
+
+**반드시 아래 JSON 형식으로만 응답하세요. 다른 설명, 인사말, 마크다운 래퍼는 절대 포함하지 마세요.**
 {
-  "name": "이름",
-  "appearance": "외모 묘사",
-  "personality": "성격 및 고유 특성",
-  "background": "배경 및 비하인드 스토리",
-  "relationships": "기존 인물들과의 관계 및 서사적 역할",
-  "speechStyle": "말투 및 시그니처 구어체"
+  "name": "이름 (한국어 웹소설에 어울리는 고유 이름)",
+  "appearance": "외모 묘사 (체형, 대표 의상, 시각적 포인트 등)",
+  "personality": "성격 및 고유 특성 (겉과 속의 차이, 딜레마, 약점 포함)",
+  "background": "배경 및 비하인드 스토리 (주인공과의 과거 접점이나 사건의 중심 계기)",
+  "relationships": "주요 등장인물(특히 주인공)과의 관계 및 서사적 역할 (갈등/조력 구도)",
+  "speechStyle": "말투 및 시그니처 구어체 (말투 특징과 시그니처 대사 예시)"
 }`;
 
-      const userPrompt = `[작품 시놉시스]\n${synopsis}\n\n[기존 인물 목록]\n${existingChars || '없음'}\n\n[추가 지시사항]\n${instruction || '시놉시스에 어울리는 중요 조연 또는 대립 인물을 생성해 주세요.'}`;
+      const userPrompt = `[작품 기본 정보]
+- 전체 시놉시스: ${synopsis}
+${description ? `- 기획 의도/설명: ${description}\n` : ''}- 시점: ${perspective}
+
+[등록된 주요 등장인물 세부 설정]
+${registeredCharsText}
+
+[현재까지의 에피소드 사건 흐름]
+${episodeFlowText}
+
+[추가 요청 지시사항]
+${instruction || '주인공의 목적 달성에 중요한 전환점이 되거나 갈등을 유발할 인물을 기획해 주세요.'}`;
 
       const res = await callAI(systemPrompt, userPrompt);
       const jsonMatch = res.match(/\{[\s\S]*\}/);
@@ -238,7 +281,7 @@ export function useStoryContext(projectId?: string) {
       console.error('AI 인물 생성 실패:', err);
       return null;
     }
-  }, [settings]);
+  }, [settings, summaries]);
 
   // 메인작가 AI에 전달할 전체 컨텍스트 빌드
   const buildAiContext = useCallback(() => {
